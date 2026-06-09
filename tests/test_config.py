@@ -29,6 +29,8 @@ def test_train_config_from_yaml(tmp_path):
     assert cfg.spec.endog == "CH_da_price_eur_per_mwh"
     assert cfg.models == ["Linear", "XGB"]
     assert cfg.horizon == 24
+    # YAML parses bare dates to datetime.date; they must be normalised to ISO strings
+    assert cfg.train_start == "2025-01-01" and isinstance(cfg.train_start, str)
 
 
 def test_train_config_rejects_unknown_model(tmp_path):

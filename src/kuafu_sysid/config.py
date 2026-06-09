@@ -10,6 +10,14 @@ from kuafu_sysid.features import FeatureSpec
 from kuafu_sysid.models import MODEL_REGISTRY
 
 
+def _datestr(v):
+    """YAML parses bare ISO dates (2025-01-01) into datetime.date; normalise to
+    an ISO string so downstream tz-aware index slicing and filename stems work."""
+    if v is None:
+        return None
+    return v.isoformat() if hasattr(v, "isoformat") else str(v)
+
+
 @dataclass
 class TrainConfig:
     target: str
@@ -44,7 +52,7 @@ class TrainConfig:
         return cls(
             target=raw["target"], spec=spec, data_path=d["path"],
             lag=raw["lag"], horizon=int(raw["horizon"]), dt_min=raw.get("dt_min"),
-            train_start=train.get("start"), train_end=train.get("end"),
+            train_start=_datestr(train.get("start")), train_end=_datestr(train.get("end")),
             split=float(train.get("split", -0.1)), models=models,
             time_features=raw.get("time_features", {"enabled": False, "holidays_country": None}),
             store_root=(raw.get("store", {}) or {}).get("root", "models"),
@@ -69,5 +77,10 @@ class SelectionConfig:
     @classmethod
     def from_yaml(cls, path: str | Path) -> "SelectionConfig":
         raw = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
-        roles = {name: RoleSpec(**spec) for name, spec in raw["roles"].items()}
+        roles = {}
+        for name, spec in raw["roles"].items():
+            rs = RoleSpec(**spec)
+            rs.train_start = _datestr(rs.train_start)
+            rs.train_end = _datestr(rs.train_end)
+            roles[name] = rs
         return cls(store_root=(raw.get("store", {}) or {}).get("root", "models"), roles=roles)
