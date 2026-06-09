@@ -1,13 +1,20 @@
 [project]
 name = "kuafu-sysid"
-version = "0.1.0"
+version = "0.2.0"
 description = "System identification (model fitting/validation) shared across kuafu projects"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "numpy",
     "pandas",
+    "pyarrow>=15",
     "scikit-learn",
+    "xgboost>=2.0",
+    "lightgbm>=4.0",
+    "joblib",
+    "pyyaml",
+    "matplotlib",
+    "holidays",
 ]
 
 [build-system]
