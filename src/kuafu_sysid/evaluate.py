@@ -32,6 +32,18 @@ class FittedForecaster:
         pred = self.model.predict(X, endog=df[self.recipe["endog"]])
         return pd.DataFrame(pred, index=X.index, columns=self.recipe["target_columns"])
 
+    def predict_quantiles(self, df: pd.DataFrame) -> dict:
+        """Map quantile -> wide forecast DataFrame. Only models that produce
+        quantiles (LGBM with a band) support this; others raise."""
+        if not hasattr(self.model, "predict_quantiles"):
+            raise ValueError(f"{self.recipe['method']} has no quantiles "
+                             "(train an LGBM with a `quantiles` band)")
+        X, _ = self.features(df)
+        X = X.reindex(columns=self.recipe["feature_columns"])
+        cols, idx = self.recipe["target_columns"], X.index
+        return {q: pd.DataFrame(a, index=idx, columns=cols)
+                for q, a in self.model.predict_quantiles(X).items()}
+
 
 @dataclass
 class EvalResult:

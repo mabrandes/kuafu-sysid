@@ -42,6 +42,13 @@ def test_lags_list_overrides_lag_count(tmp_path):
     assert cfg.lag == [0, 1, 96, 672]   # explicit list wins over lag: 96
 
 
+def test_quantiles_parsed(tmp_path):
+    p = tmp_path / "t.yaml"
+    p.write_text("target: t\ndata: {path: x, endog: y}\nhorizon: 2\nlag: 2\n"
+                 "models: [LGBM]\nquantiles: [0.1, 0.9]\n", encoding="utf-8")
+    assert TrainConfig.from_yaml(p).quantiles == (0.1, 0.9)
+
+
 def test_empty_lags_falls_back_to_lag_count(tmp_path):
     p = tmp_path / "t.yaml"
     p.write_text(

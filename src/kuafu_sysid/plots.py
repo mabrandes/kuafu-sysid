@@ -90,6 +90,34 @@ def plot_timeseries(actual: pd.Series, predictions: pd.DataFrame, step=1,
     return ax
 
 
+def plot_forecast_band(actual: pd.Series, median: pd.DataFrame, lower: pd.DataFrame,
+                       upper: pd.DataFrame, step: int = 1, start=None, end=None, ax=None):
+    """Measured vs. median forecast with a shaded uncertainty band, at one horizon
+    ``step``. ``median``/``lower``/``upper`` are wide quantile frames (same shape,
+    index = forecast origin, columns ``{endog}_h_1..H``) — e.g. the 0.5 / 0.1 / 0.9
+    outputs of ``Lgbm.predict_quantiles``. All are shifted forward by ``step`` to
+    align with the measured series at delivery time."""
+    dt = median.index.to_series().diff().median()
+
+    def _deliv(df):
+        s = pd.Series(df.iloc[:, step - 1].to_numpy(), index=df.index + step * dt)
+        return s if (start is None and end is None) else s.loc[start:end]
+
+    med, lo, hi = _deliv(median), _deliv(lower), _deliv(upper)
+    a = actual if (start is None and end is None) else actual.loc[start:end]
+    if ax is None:
+        _, ax = plt.subplots(figsize=(11, 4))
+    ax.fill_between(med.index, lo.to_numpy(), hi.to_numpy(), alpha=0.25,
+                    color="tab:orange", label="uncertainty band")
+    ax.plot(med.index, med.to_numpy(), color="tab:orange", lw=1.1, label="forecast (median)")
+    ax.plot(a.index, a.to_numpy(), color="black", lw=1.5, label="measured")
+    ax.set_ylabel(median.columns[step - 1].rsplit("_h_", 1)[0])
+    ax.set_title(f"Measured vs. forecast + band — horizon step {step}")
+    ax.legend(fontsize=8)
+    ax.grid(alpha=0.3)
+    return ax
+
+
 def plot_timeseries_compare(actual: pd.Series, preds_by_model: dict[str, pd.DataFrame],
                             step: int = 1, start=None, end=None, ax=None):
     """Overlay several models' forecasts at one horizon ``step`` vs. the measured

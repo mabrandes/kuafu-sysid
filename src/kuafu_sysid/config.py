@@ -39,6 +39,7 @@ class TrainConfig:
     # factory is called per-instance to give each its own fresh list/dict.
     models: list[str] = field(default_factory=list)
     time_features: dict = field(default_factory=lambda: {"enabled": False, "holidays_country": None})
+    quantiles: tuple = ()       # LGBM uncertainty band, e.g. (0.1, 0.9); 0.5 always added
     store_root: str = "models"
     save: bool = True
 
@@ -76,6 +77,7 @@ class TrainConfig:
             train_start=_datestr(train.get("start")), train_end=_datestr(train.get("end")),
             split=float(train.get("split", -0.1)), models=models,
             time_features=raw.get("time_features", {"enabled": False, "holidays_country": None}),
+            quantiles=tuple(raw.get("quantiles") or ()),
             store_root=(raw.get("store", {}) or {}).get("root", "models"),
             save=bool(raw.get("save", True)),
         )

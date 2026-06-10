@@ -37,6 +37,18 @@ def test_lgbm_uses_validation_early_stopping():
     assert m.best_iteration_ is not None and m.best_iteration_ < 500
 
 
+def test_lgbm_quantile_band():
+    X, Y = _xy(n=200, h=3)
+    m = Lgbm(n_estimators=20, quantiles=(0.1, 0.9)).fit(X, Y)
+    assert m.quantiles == (0.1, 0.5, 0.9)          # 0.5 always included, sorted
+    point = m.predict(X)
+    assert point.shape == (len(X), 3)              # point forecast = median
+    qp = m.predict_quantiles(X)
+    assert set(qp) == {0.1, 0.5, 0.9}
+    assert np.allclose(point, qp[0.5])             # predict() returns the 0.5 quantile
+    assert qp[0.1].mean() <= qp[0.9].mean()        # band brackets on average
+
+
 def test_feature_importances():
     X, Y = _xy(n=120)
     imp = Xgb(n_estimators=20).fit(X, Y).feature_importances()

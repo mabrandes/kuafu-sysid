@@ -3,7 +3,7 @@ def test_public_api_exports():
     for name in ["train", "evaluate", "load_forecaster", "TrainConfig",
                  "SelectionConfig", "ModelStore", "plot_error_by_horizon",
                  "plot_horizon_metrics", "plot_learning_curve", "plot_timeseries",
-                 "plot_timeseries_compare", "plot_feature_importance"]:
+                 "plot_timeseries_compare", "plot_feature_importance", "plot_forecast_band"]:
         assert hasattr(ks, name)
 
 

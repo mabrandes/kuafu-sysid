@@ -27,14 +27,16 @@ def _split(X, Y, split):
     return X.iloc[:cut], Y.iloc[:cut], X.iloc[cut:], Y.iloc[cut:]
 
 
-def _save_model_plots(art_path, model) -> None:
-    """Per-model PNGs next to the artefact: learning curve (XGB) + feature
-    importance (tree models). Cross-model comparisons live in _save_compare_plots."""
+def _save_model_plots(art_path, model, X_te=None, target_columns=None,
+                      actual=None, step: int = 1) -> None:
+    """Per-model PNGs next to the artefact: learning curve (XGB), feature importance
+    (tree models), and an uncertainty-band timeseries (quantile LGBM).
+    Cross-model comparisons live in _save_compare_plots."""
     import matplotlib
     matplotlib.use("Agg")   # headless: write files, never pop a window
     import matplotlib.pyplot as plt
 
-    from kuafu_sysid.plots import plot_feature_importance, plot_learning_curve
+    from kuafu_sysid.plots import plot_feature_importance, plot_forecast_band, plot_learning_curve
     d = art_path.parent
     stem = art_path.with_suffix("").name   # method_hash_start_end
 
@@ -47,6 +49,19 @@ def _save_model_plots(art_path, model) -> None:
         fig, ax = plt.subplots(figsize=(8, 6))
         plot_feature_importance(model, ax=ax)
         fig.savefig(d / f"{stem}_importance.png", bbox_inches="tight"); plt.close(fig)
+
+    # quantile LGBM: measured vs median + uncertainty band at `step`
+    if (X_te is not None and hasattr(model, "predict_quantiles")
+            and len(getattr(model, "quantiles", (0.5,))) > 1):
+        qp = model.predict_quantiles(X_te)
+        qs = sorted(qp)
+        wide = lambda a: pd.DataFrame(a, index=X_te.index, columns=target_columns)
+        w0 = X_te.index.min()
+        w1 = min(w0 + pd.Timedelta(days=4), X_te.index.max())
+        fig, ax = plt.subplots(figsize=(11, 4))
+        plot_forecast_band(actual, wide(qp[0.5]), wide(qp[qs[0]]), wide(qp[qs[-1]]),
+                           step=step, start=w0, end=w1, ax=ax)
+        fig.savefig(d / f"{stem}_band.png", bbox_inches="tight"); plt.close(fig)
 
 
 def _save_compare_plots(d, target, results, preds_by_method, actual,
@@ -111,12 +126,14 @@ def train(cfg: TrainConfig, verbose: bool = True,
     store = ModelStore(cfg.store_root)
     results: dict[str, pd.DataFrame] = {}
     preds_by_method: dict[str, pd.DataFrame] = {}
+    step12h = max(1, min(int(round(12 * 60 / dt_min)), cfg.horizon))   # 12 h ahead
     n = len(cfg.models)
     for i, method in enumerate(cfg.models, 1):
         log(f"[{i}/{n}] training {method} ...")
         t0 = time.perf_counter()
         model = get_model(method, horizon=cfg.horizon, endog=cfg.spec.endog,
-                          steps_per_day=spd, steps_per_week=spw, eval_log=tree_eval_log)
+                          steps_per_day=spd, steps_per_week=spw, eval_log=tree_eval_log,
+                          quantiles=cfg.quantiles)
         model.fit(X_tr, Y_tr)
         pred = model.predict(X_te, endog=df[cfg.spec.endog])
         results[method] = per_horizon_metrics(Y_te, pred)
@@ -129,9 +146,9 @@ def train(cfg: TrainConfig, verbose: bool = True,
             art = store.save(cfg.target, method, model, {**recipe_base, "method": method},
                              cfg.train_start, cfg.train_end)
             if save_plots:
-                _save_model_plots(art, model)
+                _save_model_plots(art, model, X_te=X_te, target_columns=list(Y.columns),
+                                  actual=df[cfg.spec.endog], step=step12h)
     if cfg.save and save_plots and results:
-        step12h = max(1, min(int(round(12 * 60 / dt_min)), cfg.horizon))   # 12 h ahead
         _save_compare_plots(store.root / cfg.target, cfg.target, results,
                             preds_by_method, df[cfg.spec.endog], step=step12h)
     log(f"done: {n} model(s) "
