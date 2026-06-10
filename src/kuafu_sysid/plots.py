@@ -90,6 +90,42 @@ def plot_timeseries(actual: pd.Series, predictions: pd.DataFrame, step=1,
     return ax
 
 
+def plot_forecast_origin(actual: pd.Series, predictions: pd.DataFrame, origin,
+                         lower: pd.DataFrame | None = None, upper: pd.DataFrame | None = None,
+                         ax=None):
+    """Plot the whole forecast *trajectory* issued at one ``origin`` time.
+
+    Fixes the forecast origin and walks every horizon h_1..H, so for a PV model
+    with a 1-day horizon, ``origin`` = 08:00 shows that morning's full day-ahead
+    forecast vs. what actually happened. ``predictions`` is a wide frame (index =
+    origin, columns ``{endog}_h_1..H``); optional ``lower``/``upper`` (same shape,
+    e.g. LGBM quantiles) draw an uncertainty band around the trajectory.
+    """
+    origin = pd.Timestamp(origin)
+    if origin.tzinfo is None and predictions.index.tz is not None:
+        origin = origin.tz_localize(predictions.index.tz)
+    if origin not in predictions.index:   # snap to the nearest available origin
+        origin = predictions.index[predictions.index.get_indexer([origin], method="nearest")[0]]
+    dt = predictions.index.to_series().diff().median()
+    deliv = [origin + (h + 1) * dt for h in range(predictions.shape[1])]   # h_1..h_H delivery times
+
+    if ax is None:
+        _, ax = plt.subplots(figsize=(10, 4))
+    a = actual.loc[origin:deliv[-1]]
+    ax.plot(a.index, a.to_numpy(), color="black", lw=1.6, label="measured")
+    if lower is not None and upper is not None:
+        ax.fill_between(deliv, lower.loc[origin].to_numpy(), upper.loc[origin].to_numpy(),
+                        alpha=0.2, color="tab:blue", label="band")
+    ax.plot(deliv, predictions.loc[origin].to_numpy(), color="tab:blue", marker=".",
+            ms=4, lw=1.2, label=f"forecast issued {origin:%Y-%m-%d %H:%M}")
+    ax.axvline(origin, color="grey", ls="--", lw=1)
+    ax.set_ylabel(predictions.columns[0].rsplit("_h_", 1)[0])
+    ax.set_title(f"Forecast trajectory issued at {origin:%Y-%m-%d %H:%M}")
+    ax.legend(fontsize=8)
+    ax.grid(alpha=0.3)
+    return ax
+
+
 def plot_forecast_band(actual: pd.Series, median: pd.DataFrame, lower: pd.DataFrame,
                        upper: pd.DataFrame, step: int = 1, start=None, end=None, ax=None):
     """Measured vs. median forecast with a shaded uncertainty band, at one horizon

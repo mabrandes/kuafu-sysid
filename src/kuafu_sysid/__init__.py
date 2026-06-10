@@ -7,7 +7,7 @@ from kuafu_sysid.evaluate import EvalResult, FittedForecaster, evaluate, load_fo
 from kuafu_sysid.features import FeatureSpec, build_features, feature_hash
 from kuafu_sysid.models import MODEL_REGISTRY, get_model
 from kuafu_sysid.plots import (
-    plot_error_by_horizon, plot_feature_importance, plot_forecast_band,
+    plot_error_by_horizon, plot_feature_importance, plot_forecast_band, plot_forecast_origin,
     plot_horizon_metrics, plot_learning_curve, plot_timeseries, plot_timeseries_compare,
 )
 from kuafu_sysid.store import ModelStore
@@ -19,5 +19,5 @@ __all__ = [
     "evaluate", "load_forecaster", "FittedForecaster", "EvalResult",
     "plot_error_by_horizon", "plot_horizon_metrics", "plot_learning_curve",
     "plot_timeseries", "plot_timeseries_compare", "plot_feature_importance",
-    "plot_forecast_band",
+    "plot_forecast_band", "plot_forecast_origin",
 ]

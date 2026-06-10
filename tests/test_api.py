@@ -22,6 +22,18 @@ def test_plot_timeseries_multistep_and_horizon_metrics():
     assert len(axes) == 3
 
 
+def test_plot_forecast_origin():
+    import matplotlib
+    matplotlib.use("Agg")
+    import numpy as np, pandas as pd
+    from kuafu_sysid import plot_forecast_origin
+    idx = pd.date_range("2025-07-01", periods=200, freq="h", tz="Europe/Zurich")
+    actual = pd.Series(np.arange(200.0), index=idx)
+    preds = pd.DataFrame({f"y_h_{h}": np.arange(200.0) + h for h in range(1, 5)}, index=idx)
+    ax = plot_forecast_origin(actual, preds, origin="2025-07-02 08:00")
+    assert ax is not None
+
+
 def test_plot_timeseries_returns_axes():
     import matplotlib
     matplotlib.use("Agg")
