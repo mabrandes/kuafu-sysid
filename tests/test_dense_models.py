@@ -37,6 +37,19 @@ def test_linear_save_load_roundtrip(tmp_path):
     assert np.allclose(np.nan_to_num(m.predict(X)), np.nan_to_num(m2.predict(X)))
 
 
+def test_linear_cross_validates_alpha_by_default():
+    X, Y = _xy(h=3)
+    m = Linear().fit(X, Y)                 # alpha=None -> RidgeCV per horizon
+    assert m.alpha_ is not None and len(m.alpha_) == 3
+    assert all(a in (0.01, 0.1, 1.0, 10.0, 100.0) for a in m.alpha_)
+
+
+def test_linear_fixed_alpha_skips_cv():
+    X, Y = _xy()
+    m = Linear(alpha=1.0).fit(X, Y)        # explicit alpha -> no CV
+    assert m.alpha_ is None
+
+
 def test_knn_fit_predict_shape():
     X, Y = _xy()
     out = Knn(n_neighbors=5).fit(X, Y).predict(X)

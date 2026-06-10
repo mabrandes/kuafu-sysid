@@ -31,9 +31,14 @@ class Persistence(Forecaster):
         self.endog = endog
 
     def fit(self, X: pd.DataFrame, Y: pd.DataFrame) -> "Persistence":
+        """No-op. X: (n_samples, n_features), Y: (n_samples, horizon H) — accepted
+        for a uniform interface but unused; a persistence baseline learns nothing."""
         return self  # nothing to learn
 
     def predict(self, X: pd.DataFrame, endog: pd.Series | None = None) -> np.ndarray:
+        """Predict all horizons from the endog series alone. X: (n_samples, …) — only
+        its index/length are used; ``endog`` is the full target series (required).
+        Returns (len(X), horizon H): step h = endog shifted by ``period_steps``."""
         if endog is None:
             raise ValueError(
                 "Persistence baselines need the endog series; call predict(X, endog=...)."

@@ -32,6 +32,10 @@ class Lgbm(Forecaster):
         self.best_iteration_: int | None = None   # median best_iteration across horizons
 
     def fit(self, X: pd.DataFrame, Y: pd.DataFrame) -> "Lgbm":
+        """Fit one LightGBM per horizon (H models). X: (n_samples, n_features) —
+        NaN allowed (tree-native); Y: (n_samples, horizon H). Per column, rows with
+        a NaN target are dropped and the last ``val_fraction`` is held out for early
+        stopping."""
         self._columns = list(X.columns)
         Xv = X.to_numpy(float)
         self._models = []
@@ -64,6 +68,9 @@ class Lgbm(Forecaster):
         return pd.Series(imp, index=self._columns)
 
     def predict(self, X: pd.DataFrame, endog=None) -> np.ndarray:
+        """Predict all horizons. X: (n_samples, n_features) — reindexed to the
+        training columns, NaN allowed. Stacks the H per-horizon models' outputs ->
+        (n_samples, horizon H); each uses its own early-stopped best_iteration_."""
         Xv = X.reindex(columns=self._columns).to_numpy(float)
         return np.column_stack([est.predict(Xv) for est in self._models])
 

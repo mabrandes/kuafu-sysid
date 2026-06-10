@@ -34,6 +34,9 @@ class Xgb(Forecaster):
         self.evals_result_: dict | None = None   # {'validation_0': train, 'validation_1': val}
 
     def fit(self, X: pd.DataFrame, Y: pd.DataFrame) -> "Xgb":
+        """Fit one multi-output booster. X: (n_samples, n_features) — NaN allowed
+        (tree-native); Y: (n_samples, horizon H) — rows with any NaN target dropped.
+        The last ``val_fraction`` of rows is held out for early stopping."""
         self._columns = list(X.columns)
         m = Y.notna().all(axis=1)  # complete targets; X may contain NaN (tree-native)
         Xv, Yv = X.loc[m].to_numpy(float), Y.loc[m].to_numpy(float)
@@ -56,6 +59,9 @@ class Xgb(Forecaster):
         return pd.Series(self._model.feature_importances_, index=self._columns)
 
     def predict(self, X: pd.DataFrame, endog=None) -> np.ndarray:
+        """Predict all horizons. X: (n_samples, n_features) — reindexed to the
+        training columns, NaN allowed. Returns (n_samples, horizon H), using only
+        the trees up to ``best_iteration`` when early stopping was applied."""
         Xa = X.reindex(columns=self._columns).to_numpy(float)
         if self.best_iteration_ is not None:
             return self._model.predict(Xa, iteration_range=(0, self.best_iteration_ + 1))

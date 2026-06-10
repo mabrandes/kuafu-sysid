@@ -21,6 +21,8 @@ class Knn(Forecaster):
         self._n_out: int = 0
 
     def fit(self, X: pd.DataFrame, Y: pd.DataFrame) -> "Knn":
+        """Fit a multi-output KNN. X: (n_samples, n_features); Y: (n_samples,
+        horizon H). Rows with any NaN in X or Y are dropped (dense model)."""
         self._columns = list(X.columns)
         self._n_out = Y.shape[1]
         mask = X.notna().all(axis=1) & Y.notna().all(axis=1)
@@ -28,6 +30,8 @@ class Knn(Forecaster):
         return self
 
     def predict(self, X: pd.DataFrame, endog=None) -> np.ndarray:
+        """Predict all horizons. X: (n_samples, n_features) — reindexed to the
+        training columns. Returns (n_samples, horizon H); NaN-feature rows -> NaN."""
         Xv = X.reindex(columns=self._columns)
         complete = Xv.notna().all(axis=1).to_numpy()
         out = np.full((len(Xv), self._n_out), np.nan)

@@ -24,7 +24,10 @@ class Forecaster(ABC):
     requires_fit: bool = True    # baselines (e.g. persistence) set this False
 
     @abstractmethod
-    def fit(self, X: pd.DataFrame, Y: pd.DataFrame) -> "Forecaster": ...
+    def fit(self, X: pd.DataFrame, Y: pd.DataFrame) -> "Forecaster":
+        """Fit on design matrix ``X`` (n_samples, n_features) and multi-step targets
+        ``Y`` (n_samples, horizon H, columns ``{endog}_h_1..H``). Returns ``self``."""
+        ...
 
     @abstractmethod
     def predict(self, X: pd.DataFrame, endog: pd.Series | None = None) -> np.ndarray:
