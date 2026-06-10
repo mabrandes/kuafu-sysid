@@ -17,7 +17,8 @@ class Lgbm(Forecaster):
 
     def __init__(self, n_estimators: int = 1000, num_leaves: int = 31,
                  learning_rate: float = 0.05, quantile: float | None = None,
-                 early_stopping_rounds: int = 50, val_fraction: float = 0.2, **_ignored):
+                 early_stopping_rounds: int = 50, val_fraction: float = 0.2,
+                 eval_log: int = 0, **_ignored):
         objective = "quantile" if quantile is not None else "regression"
         # n_estimators is an upper bound; early stopping per horizon picks best_iteration_.
         self._kwargs = dict(n_estimators=n_estimators, num_leaves=num_leaves,
@@ -25,6 +26,7 @@ class Lgbm(Forecaster):
                             alpha=quantile if quantile is not None else 0.5, verbose=-1)
         self.early_stopping_rounds = early_stopping_rounds
         self.val_fraction = val_fraction
+        self.eval_log = eval_log    # 0 = silent; N>0 logs train/val every N rounds (per horizon)
         self._models: list[LGBMRegressor] = []
         self._columns: list[str] | None = None
         self.best_iteration_: int | None = None   # median best_iteration across horizons
@@ -42,8 +44,12 @@ class Lgbm(Forecaster):
             n = len(Xc)
             if self.early_stopping_rounds and self.val_fraction and n >= 20:
                 cut = max(1, int(n * (1 - self.val_fraction)))  # time-ordered val tail
-                est.fit(Xc[:cut], yc[:cut], eval_set=[(Xc[cut:], yc[cut:])],
-                        callbacks=[lgb.early_stopping(self.early_stopping_rounds, verbose=False)])
+                callbacks = [lgb.early_stopping(self.early_stopping_rounds, verbose=False)]
+                if self.eval_log:
+                    callbacks.append(lgb.log_evaluation(self.eval_log))
+                est.fit(Xc[:cut], yc[:cut],
+                        eval_set=[(Xc[:cut], yc[:cut]), (Xc[cut:], yc[cut:])],
+                        eval_names=["train", "val"], callbacks=callbacks)
                 if est.best_iteration_:
                     best_iters.append(est.best_iteration_)
             else:

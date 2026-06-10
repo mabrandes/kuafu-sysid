@@ -17,11 +17,13 @@ class Xgb(Forecaster):
     def __init__(self, n_estimators: int = 1000, max_depth: int = 6,
                  learning_rate: float = 0.05, subsample: float = 0.8,
                  colsample_bytree: float = 0.8, early_stopping_rounds: int = 50,
-                 val_fraction: float = 0.2, **_ignored):
+                 val_fraction: float = 0.2, eval_log: int = 0, **_ignored):
         # n_estimators is an upper bound; early stopping on a held-out validation
         # tail picks the actual number of trees (best_iteration).
+        # eval_log: 0 = silent; N>0 prints train/validation RMSE every N rounds.
         self.early_stopping_rounds = early_stopping_rounds
         self.val_fraction = val_fraction
+        self.eval_log = eval_log
         self._model = XGBRegressor(
             n_estimators=n_estimators, max_depth=max_depth, learning_rate=learning_rate,
             subsample=subsample, colsample_bytree=colsample_bytree,
@@ -42,7 +44,7 @@ class Xgb(Forecaster):
             self._model.fit(
                 Xv[:cut], Yv[:cut],
                 eval_set=[(Xv[:cut], Yv[:cut]), (Xv[cut:], Yv[cut:])],  # [train, validation]
-                verbose=False,
+                verbose=self.eval_log,   # 0=silent; N prints validation_0/1 RMSE every N rounds
             )
             self.best_iteration_ = int(getattr(self._model, "best_iteration", None) or 0)
             self.evals_result_ = self._model.evals_result()

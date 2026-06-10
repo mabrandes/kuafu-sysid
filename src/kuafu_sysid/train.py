@@ -27,10 +27,13 @@ def _split(X, Y, split):
     return X.iloc[:cut], Y.iloc[:cut], X.iloc[cut:], Y.iloc[cut:]
 
 
-def train(cfg: TrainConfig, verbose: bool = True) -> dict[str, pd.DataFrame]:
+def train(cfg: TrainConfig, verbose: bool = True,
+          tree_eval_log: int = 0) -> dict[str, pd.DataFrame]:
     """Train every model in ``cfg.models`` and (optionally) save them.
 
-    Set ``verbose=False`` to silence the progress prints.
+    ``verbose=False`` silences the per-model progress prints. ``tree_eval_log=N``
+    (N>0) streams XGB/LGBM train-vs-validation RMSE every N boosting rounds — like
+    XGBoost's ``verbose=True`` (note LGBM prints per horizon, so it's chattier).
     """
     def log(msg: str) -> None:
         if verbose:
@@ -66,7 +69,7 @@ def train(cfg: TrainConfig, verbose: bool = True) -> dict[str, pd.DataFrame]:
         log(f"[{i}/{n}] training {method} ...")
         t0 = time.perf_counter()
         model = get_model(method, horizon=cfg.horizon, endog=cfg.spec.endog,
-                          steps_per_day=spd, steps_per_week=spw)
+                          steps_per_day=spd, steps_per_week=spw, eval_log=tree_eval_log)
         model.fit(X_tr, Y_tr)
         pred = model.predict(X_te, endog=df[cfg.spec.endog])
         results[method] = per_horizon_metrics(Y_te, pred)
