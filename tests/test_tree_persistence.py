@@ -37,6 +37,14 @@ def test_lgbm_uses_validation_early_stopping():
     assert m.best_iteration_ is not None and m.best_iteration_ < 500
 
 
+def test_feature_importances():
+    X, Y = _xy(n=120)
+    imp = Xgb(n_estimators=20).fit(X, Y).feature_importances()
+    assert list(imp.index) == list(X.columns) and len(imp) == X.shape[1]
+    imp_l = Lgbm(n_estimators=20).fit(X, Y).feature_importances()
+    assert list(imp_l.index) == list(X.columns)
+
+
 def test_lgbm_roundtrip(tmp_path):
     X, Y = _xy()
     m = Lgbm(n_estimators=10).fit(X, Y)

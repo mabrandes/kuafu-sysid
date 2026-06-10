@@ -27,13 +27,49 @@ def _split(X, Y, split):
     return X.iloc[:cut], Y.iloc[:cut], X.iloc[cut:], Y.iloc[cut:]
 
 
+def _save_model_plots(art_path, method, metrics_df, model, preds_df, actual) -> None:
+    """Save horizon / timeseries / feature-importance PNGs next to the artefact."""
+    import matplotlib
+    matplotlib.use("Agg")   # headless: write files, never pop a window
+    import matplotlib.pyplot as plt
+
+    from kuafu_sysid.plots import (
+        plot_error_by_horizon, plot_feature_importance, plot_learning_curve, plot_timeseries,
+    )
+    d = art_path.parent
+    stem = art_path.with_suffix("").name   # method_hash_start_end
+
+    if getattr(model, "evals_result_", None):   # XGB train-vs-validation (over/underfitting)
+        fig, ax = plt.subplots(figsize=(8, 4))
+        plot_learning_curve(model, ax=ax)
+        fig.savefig(d / f"{stem}_learning_curve.png", bbox_inches="tight"); plt.close(fig)
+
+    fig, ax = plt.subplots(figsize=(8, 4))
+    plot_error_by_horizon({method: metrics_df}, ax=ax)
+    fig.savefig(d / f"{stem}_horizon.png", bbox_inches="tight"); plt.close(fig)
+
+    if len(preds_df):
+        w0 = preds_df.index.min()
+        w1 = min(w0 + pd.Timedelta(days=14), preds_df.index.max())   # readable window
+        fig, ax = plt.subplots(figsize=(11, 4))
+        plot_timeseries(actual, preds_df, step=1, start=w0, end=w1, ax=ax)
+        fig.savefig(d / f"{stem}_timeseries.png", bbox_inches="tight"); plt.close(fig)
+
+    if model.feature_importances() is not None:   # tree models only
+        fig, ax = plt.subplots(figsize=(8, 6))
+        plot_feature_importance(model, ax=ax)
+        fig.savefig(d / f"{stem}_importance.png", bbox_inches="tight"); plt.close(fig)
+
+
 def train(cfg: TrainConfig, verbose: bool = True,
-          tree_eval_log: int = 0) -> dict[str, pd.DataFrame]:
+          tree_eval_log: int = 0, save_plots: bool = True) -> dict[str, pd.DataFrame]:
     """Train every model in ``cfg.models`` and (optionally) save them.
 
     ``verbose=False`` silences the per-model progress prints. ``tree_eval_log=N``
     (N>0) streams XGB/LGBM train-vs-validation RMSE every N boosting rounds — like
     XGBoost's ``verbose=True`` (note LGBM prints per horizon, so it's chattier).
+    ``save_plots`` (default True, only when ``cfg.save``) writes a horizon,
+    timeseries, and (tree-only) feature-importance PNG next to each saved model.
     """
     def log(msg: str) -> None:
         if verbose:
@@ -78,8 +114,12 @@ def train(cfg: TrainConfig, verbose: bool = True,
         es = f", early-stopped @ {bi} trees" if bi else ""
         log(f"[{i}/{n}] {method}: mean RMSE={results[method]['rmse'].mean():.3f}  ({dt:.1f}s{es})")
         if cfg.save:
-            store.save(cfg.target, method, model, {**recipe_base, "method": method},
-                       cfg.train_start, cfg.train_end)
+            art = store.save(cfg.target, method, model, {**recipe_base, "method": method},
+                             cfg.train_start, cfg.train_end)
+            if save_plots:
+                preds_df = pd.DataFrame(pred, index=X_te.index, columns=list(Y.columns))
+                _save_model_plots(art, method, results[method], model,
+                                  preds_df, df[cfg.spec.endog])
     log(f"done: {n} model(s) "
         + ("saved to " + str(store.root / cfg.target) if cfg.save else "(not saved)"))
     return results

@@ -35,3 +35,15 @@ def test_train_writes_artefacts_and_returns_metrics(tmp_path):
     d = tmp_path / "models" / "t"
     assert any(f.name.startswith("Linear_") and f.suffix == ".joblib" for f in d.iterdir())
     assert (d / "_latest.json").exists()
+    # plots saved next to the models (save_plots default True)
+    pngs = [f.name for f in d.glob("*.png")]
+    assert any(n.startswith("XGB_") and n.endswith("_importance.png") for n in pngs)  # tree-only
+    assert any(n.endswith("_horizon.png") for n in pngs)
+    assert any(n.endswith("_timeseries.png") for n in pngs)
+    assert not any(n.startswith("Persistence") and n.endswith("_importance.png") for n in pngs)
+
+
+def test_train_no_plots_when_disabled(tmp_path):
+    data_path = _make_parquet(tmp_path)
+    train(_cfg(tmp_path, data_path), save_plots=False)
+    assert not list((tmp_path / "models" / "t").glob("*.png"))

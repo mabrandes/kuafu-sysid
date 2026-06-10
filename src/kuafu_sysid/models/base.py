@@ -45,3 +45,8 @@ class Forecaster(ABC):
     @classmethod
     @abstractmethod
     def load(cls, path: Path) -> "Forecaster": ...
+
+    def feature_importances(self) -> "pd.Series | None":
+        """Importance per feature (indexed by column name), or None if the model
+        has none (e.g. persistence baselines). Tree adapters override this."""
+        return None

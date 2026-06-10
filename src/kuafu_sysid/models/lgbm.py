@@ -58,6 +58,11 @@ class Lgbm(Forecaster):
         self.best_iteration_ = int(np.median(best_iters)) if best_iters else None
         return self
 
+    def feature_importances(self) -> pd.Series:
+        # average the per-horizon models' importances
+        imp = np.mean([m.feature_importances_ for m in self._models], axis=0)
+        return pd.Series(imp, index=self._columns)
+
     def predict(self, X: pd.DataFrame, endog=None) -> np.ndarray:
         Xv = X.reindex(columns=self._columns).to_numpy(float)
         return np.column_stack([est.predict(Xv) for est in self._models])

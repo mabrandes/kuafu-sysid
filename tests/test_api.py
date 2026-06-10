@@ -2,7 +2,7 @@ def test_public_api_exports():
     import kuafu_sysid as ks
     for name in ["train", "evaluate", "load_forecaster", "TrainConfig",
                  "SelectionConfig", "ModelStore", "plot_error_by_horizon",
-                 "plot_learning_curve", "plot_timeseries"]:
+                 "plot_learning_curve", "plot_timeseries", "plot_feature_importance"]:
         assert hasattr(ks, name)
 
 

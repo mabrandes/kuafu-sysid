@@ -19,6 +19,24 @@ def plot_error_by_horizon(metrics_by_method: dict[str, pd.DataFrame], metric: st
     return ax
 
 
+def plot_feature_importance(model, top: int = 30, ax=None):
+    """Horizontal bar chart of a tree model's top-``top`` feature importances.
+
+    Works for `Xgb`/`Lgbm` (averaged across horizons for LGBM). Raises for models
+    without importances (Linear/KNN/persistence)."""
+    imp = model.feature_importances()
+    if imp is None:
+        raise ValueError("this model has no feature importances (not a tree model)")
+    imp = imp.sort_values(ascending=False).head(top).iloc[::-1]   # largest at top
+    if ax is None:
+        _, ax = plt.subplots(figsize=(8, min(0.3 * len(imp) + 1, 11)))
+    ax.barh(imp.index.astype(str), imp.to_numpy())
+    ax.set_xlabel("importance")
+    ax.set_title(f"Feature importance (top {len(imp)})")
+    ax.tick_params(axis="y", labelsize=7)
+    return ax
+
+
 def plot_timeseries(actual: pd.Series, predictions: pd.DataFrame, step: int = 1,
                     start=None, end=None, ax=None):
     """Plot measured vs. forecast over calendar (delivery) time for one horizon step.

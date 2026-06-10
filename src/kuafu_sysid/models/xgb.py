@@ -52,6 +52,9 @@ class Xgb(Forecaster):
             self._model.fit(Xv, Yv)   # too few rows to hold out a validation set
         return self
 
+    def feature_importances(self) -> pd.Series:
+        return pd.Series(self._model.feature_importances_, index=self._columns)
+
     def predict(self, X: pd.DataFrame, endog=None) -> np.ndarray:
         Xa = X.reindex(columns=self._columns).to_numpy(float)
         if self.best_iteration_ is not None:
