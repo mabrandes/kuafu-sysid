@@ -1,0 +1,30 @@
+# Example training config for kuafu-sysid.
+#
+# The companion notebook (example.ipynb) generates `data/demo.parquet` with
+# columns: y (target), load (driver), load_fc (a known-ahead forecast of load),
+# then trains every model listed below and saves them under models/demo/.
+target: demo
+data:
+  path: data/demo.parquet
+  endog: y                       # what we forecast
+  exog: [load]                   # current-step driver (known at origin)
+  exog_with_lag: [load]          # also add lagged copies of load
+  forecast_exog: [load_fc]       # known-ahead forecast, aligned to future slots
+dt_min: 60                       # hourly demo
+lag: 48                          # lag count: used only when `lags` is empty -> 0..47
+lags: [0, 1, 2, 24, 48]          # explicit selection (recent + daily) -> overrides `lag`
+horizon: 24                      # 1 day ahead
+train:
+  start: 2024-01-01
+  end:   2024-03-01
+  split: -0.2                    # test = first 20% (negative = test-before-train backtest)
+models: [Linear, Persistence_prev_step, Persistence_prev_day, XGB, LGBM]
+time_features:
+  time_of_day: true              # diurnal cycle
+  day_of_week: true              # weekday effects
+  day_of_year: false             # short window -> skip seasonality
+  holidays_country:              # null -> no holiday flag
+  encoding: cyclical             # cyclical (sin/cos) or onehot (dummies)
+store:
+  root: models
+save: true

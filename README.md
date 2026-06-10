@@ -3,6 +3,14 @@
 Generic, config-driven forecasting framework (direct multi-step regression)
 shared across `kuafu_*` projects.
 
+## Example
+
+A runnable end-to-end demo lives in [`examples/`](examples/): `example.ipynb`
+generates a small synthetic dataset, then trains/evaluates from
+[`examples/sysid_train.yaml`](examples/sysid_train.yaml) and
+[`examples/sysid_select.yaml`](examples/sysid_select.yaml). Run the notebook from
+the `examples/` directory.
+
 ## Usage
 
 ```python

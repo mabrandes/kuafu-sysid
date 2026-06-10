@@ -7,3 +7,8 @@ dist/
 .pytest_cache/
 .env
 uv.lock
+
+# example notebook artefacts (generated on run)
+examples/data/
+examples/models/
+.ipynb_checkpoints/
