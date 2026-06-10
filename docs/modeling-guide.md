@@ -12,7 +12,9 @@ speed, and how much data you need.
 | **Explicit `lags` list** | use a *selection* of lags (e.g. `[0,1,2,96,672]`) instead of dense `0..lag-1` → smaller, faster, data-efficient | `lags:` overrides `lag:` · [§ lags](#lags--efficient-training) |
 | **Persistence from endog** | `prev_step`/`prev_day`/`prev_week` baselines read the target series directly, so they work at **any** `lag` (no need to inflate it) | automatic for `Persistence_*` models |
 | **Validation + early stopping** | XGB/LGBM hold out a validation tail and stop at `best_iteration`; `n_estimators` is just an upper bound | `n_estimators`/`early_stopping_rounds`/`val_fraction` · [§ tree models](#tree-models-trees-learning-rate-validation--early-stopping) |
-| **Learning curve** | `plot_learning_curve(model)` shows train vs. validation RMSE per round | [§ tree models](#tree-models-trees-learning-rate-validation--early-stopping) |
+| **Learning curve** | `plot_learning_curve(model)` shows train vs. validation RMSE per round (over/underfitting) | [§ tree models](#tree-models-trees-learning-rate-validation--early-stopping) |
+| **Feature importance** | `plot_feature_importance(model)` for XGB/LGBM (averaged across horizons for LGBM) | `model.feature_importances()` |
+| **Saved diagnostics** | `train()` writes `<model>_{horizon,timeseries,importance,learning_curve}.png` next to each saved model | `save_plots=True` (default) |
 | **Progress prints** | `train()` logs data shape, feature count, and per-model RMSE / time / early-stop trees (`verbose=True`) | on by default |
 | **Self-describing store** | each model saved by feature-`hash` + `_config.json` recipe + `_latest.json`, so config variants coexist and pin reproducibly | `store.root` + `sysid_select.yaml` |
 
