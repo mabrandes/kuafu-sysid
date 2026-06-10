@@ -19,6 +19,34 @@ def plot_error_by_horizon(metrics_by_method: dict[str, pd.DataFrame], metric: st
     return ax
 
 
+def plot_timeseries(actual: pd.Series, predictions: pd.DataFrame, step: int = 1,
+                    start=None, end=None, ax=None):
+    """Plot measured vs. forecast over calendar (delivery) time for one horizon step.
+
+    ``actual``       — the endog series (e.g. ``df[endog]``).
+    ``predictions``  — wide forecast frame from ``evaluate()`` / ``load_forecaster``
+                       (index = forecast origin, columns ``{endog}_h_1..H``).
+    ``step``         — which horizon step to show (1 = next step ahead).
+    The step-``h`` forecast issued at origin ``t`` is for delivery time ``t + h``,
+    so the forecast index is shifted forward by ``h`` steps to line up with actuals.
+    ``start``/``end`` zoom to a date window (recommended — full series is dense).
+    """
+    col = predictions.columns[step - 1]
+    dt = predictions.index.to_series().diff().median()
+    pred = pd.Series(predictions[col].to_numpy(), index=predictions.index + step * dt)
+    a = actual if (start is None and end is None) else actual.loc[start:end]
+    p = pred if (start is None and end is None) else pred.loc[start:end]
+    if ax is None:
+        _, ax = plt.subplots(figsize=(11, 4))
+    ax.plot(a.index, a.to_numpy(), label="measured", lw=1.0)
+    ax.plot(p.index, p.to_numpy(), label=f"forecast (h={step})", lw=1.0, alpha=0.8)
+    ax.set_ylabel(col.rsplit("_h_", 1)[0])
+    ax.set_title(f"Measured vs. forecast — horizon step {step}")
+    ax.legend(fontsize=8)
+    ax.grid(alpha=0.3)
+    return ax
+
+
 def plot_learning_curve(model, ax=None):
     """Train vs. validation RMSE per boosting round for an XGB model.
 

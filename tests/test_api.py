@@ -1,8 +1,21 @@
 def test_public_api_exports():
     import kuafu_sysid as ks
     for name in ["train", "evaluate", "load_forecaster", "TrainConfig",
-                 "SelectionConfig", "ModelStore", "plot_error_by_horizon"]:
+                 "SelectionConfig", "ModelStore", "plot_error_by_horizon",
+                 "plot_learning_curve", "plot_timeseries"]:
         assert hasattr(ks, name)
+
+
+def test_plot_timeseries_returns_axes():
+    import matplotlib
+    matplotlib.use("Agg")
+    import numpy as np, pandas as pd
+    from kuafu_sysid import plot_timeseries
+    idx = pd.date_range("2025-01-01", periods=48, freq="h", tz="Europe/Zurich")
+    actual = pd.Series(np.arange(48.0), index=idx)
+    preds = pd.DataFrame({"y_h_1": np.arange(48.0), "y_h_2": np.arange(48.0)}, index=idx)
+    ax = plot_timeseries(actual, preds, step=2, start="2025-01-01", end="2025-01-02")
+    assert ax is not None
 
 
 def test_plot_error_by_horizon_returns_axes():
