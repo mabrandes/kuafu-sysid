@@ -3,6 +3,19 @@
 Practical guidance for the config knobs that most affect accuracy, training
 speed, and how much data you need.
 
+## Features at a glance
+
+| Feature | What it does | Where |
+|---------|--------------|-------|
+| **Time-feature toggles** | turn `time_of_day` / `day_of_week` / `day_of_year` / holidays on independently | `time_features:` in the train config · [§ encoding](#time-feature-encoding-cyclical-vs-one-hot) |
+| **Encoding `cyclical` / `onehot`** | sin/cos pairs (compact) vs. category dummies (flexible) | `time_features.encoding` · [§ encoding](#time-feature-encoding-cyclical-vs-one-hot) |
+| **Explicit `lags` list** | use a *selection* of lags (e.g. `[0,1,2,96,672]`) instead of dense `0..lag-1` → smaller, faster, data-efficient | `lags:` overrides `lag:` · [§ lags](#lags--efficient-training) |
+| **Persistence from endog** | `prev_step`/`prev_day`/`prev_week` baselines read the target series directly, so they work at **any** `lag` (no need to inflate it) | automatic for `Persistence_*` models |
+| **Validation + early stopping** | XGB/LGBM hold out a validation tail and stop at `best_iteration`; `n_estimators` is just an upper bound | `n_estimators`/`early_stopping_rounds`/`val_fraction` · [§ tree models](#tree-models-trees-learning-rate-validation--early-stopping) |
+| **Learning curve** | `plot_learning_curve(model)` shows train vs. validation RMSE per round | [§ tree models](#tree-models-trees-learning-rate-validation--early-stopping) |
+| **Progress prints** | `train()` logs data shape, feature count, and per-model RMSE / time / early-stop trees (`verbose=True`) | on by default |
+| **Self-describing store** | each model saved by feature-`hash` + `_config.json` recipe + `_latest.json`, so config variants coexist and pin reproducibly | `store.root` + `sysid_select.yaml` |
+
 ## Time-feature encoding: cyclical vs. one-hot
 
 `time_features.encoding` controls how calendar components (hour-of-day,
