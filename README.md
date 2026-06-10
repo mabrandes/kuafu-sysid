@@ -32,14 +32,20 @@ Models: `Linear`, `KNN`, `XGB`, `LGBM`, `Persistence_prev_step/day/week`.
 Models are saved under `<store.root>/<target>/` with a feature-hash name, a
 `_config.json` sidecar (full recipe), and a `_latest.json` pointer.
 
-## Choosing lags & time-feature encoding
+`XGB`/`LGBM` train with a held-out **validation tail + early stopping**
+(`n_estimators` is just an upper bound — training stops at `best_iteration`); the
+`train()` log reports it and `plot_learning_curve()` shows the train-vs-validation
+curve.
+
+## Choosing lags, encoding & tree settings
 
 `lag` is the lag count (`0..lag-1`); set an explicit `lags` list to use only
 selected lags (overrides `lag` when non-empty — e.g. `[0,1,2,95,96,672]` for
 recent + daily + weekly structure). `time_features.encoding` is `cyclical`
 (compact sin/cos) or `onehot` (dummies). For the trade-offs — cyclical vs.
-one-hot per model type, and pruning lags for fast, data-efficient training —
-see **[docs/modeling-guide.md](docs/modeling-guide.md)**.
+one-hot per model type, pruning lags for fast/data-efficient training, and what
+`n_estimators` / `learning_rate` / **early stopping** / validation mean for the
+tree models — see **[docs/modeling-guide.md](docs/modeling-guide.md)**.
 
 ## Install
 

@@ -88,3 +88,78 @@ Persistence baselines (`prev_step/day/week`) read the endog series directly, so
 Because every choice above feeds the `feature_hash`, you can train several
 variants, compare their per-horizon metrics, and pin the best one in
 `sysid_select.yaml` — without any of them overwriting each other.
+
+## Tree models: trees, learning rate, validation & early stopping
+
+`XGB` and `LGBM` are **gradient-boosted trees**: they build an ensemble of small
+decision trees *one at a time*, where each new tree is fit to the errors
+(residuals) the ensemble still makes. Two parameters govern this:
+
+- **`n_estimators`** — the number of trees / boosting rounds. Each added tree
+  reduces training error a bit more. Too few → *underfit* (not enough capacity);
+  too many → *overfit* (the model starts memorising noise and generalises worse).
+- **`learning_rate`** (shrinkage) — how much each tree contributes. Smaller steps
+  generalise better but need *more* trees to reach the same fit. Typical pairing:
+  a small learning rate (`0.05`) with a large `n_estimators` upper bound, then let
+  early stopping decide how many trees are actually used.
+
+### Early stopping (and why `n_estimators` is just an upper bound)
+
+Rather than guess the right number of trees, we **hold out a validation set** and
+watch its error after each new tree:
+
+- after every boosting round, error is measured on the validation set;
+- if it hasn't improved for **`early_stopping_rounds`** consecutive rounds, training
+  stops;
+- the model remembers **`best_iteration`** — the round with the lowest validation
+  error — and predicts using only those trees.
+
+So `n_estimators` is an *upper bound*: training usually stops well before it. This
+**prevents overfitting** (you don't keep adding trees once they stop helping unseen
+data) and **saves compute**. The progress log shows it, e.g.
+`XGB: mean RMSE=2.41 (8.3s, early-stopped @ 137 trees)`.
+
+### Where the validation set comes from
+
+The validation set is the **last `val_fraction` of the training data** (a
+time-ordered tail — the most recent rows). Crucially it is carved out of the
+*training* split, **not** the test split, so the held-out test set stays clean and
+the reported per-horizon metrics are honest (no early-stopping leakage).
+
+```
+|<--------------- training window --------------->|<---- test ---->|
+|<------ fit trees ------>|<-- validation (val_fraction) -->|        (early stopping watches this)
+```
+
+### Defaults & knobs
+
+| Param | Default | Meaning |
+|-------|---------|---------|
+| `n_estimators` | 1000 | max trees (upper bound; early stopping usually stops sooner) |
+| `learning_rate` | 0.05 | contribution per tree |
+| `early_stopping_rounds` | 50 | stop after this many rounds with no validation improvement |
+| `val_fraction` | 0.2 | fraction of the train window held out to monitor |
+| `max_depth` (XGB) / `num_leaves` (LGBM) | 6 / 31 | tree size (capacity per tree) |
+| `subsample`, `colsample_bytree` (XGB) | 0.8 | row / column sampling per tree (regularisation) |
+
+`LGBM` applies the same idea **per horizon step** (one model per step), so each
+step early-stops independently. `Linear`/`KNN` have no boosting rounds, so early
+stopping does not apply to them.
+
+### Seeing the learning curve
+
+A freshly-trained `Xgb` keeps the train-vs-validation error per round in
+`evals_result_`; plot it to see under/overfitting and where early stopping fired:
+
+```python
+from kuafu_sysid import get_model, plot_learning_curve
+from kuafu_sysid.features import build_features
+X, Y = build_features(df, spec, lag, horizon, dt_min, time_features)
+m = get_model("XGB", horizon=horizon, endog="pv").fit(X.iloc[:n_tr], Y.iloc[:n_tr])
+plot_learning_curve(m)   # train vs validation RMSE, with the best-iteration marked
+```
+
+Reading it: the **train** curve keeps falling; the **validation** curve falls then
+flattens (or rises) — the dashed line marks `best_iteration`, where validation
+stopped improving. A big gap between the two curves means overfitting (reduce
+`max_depth`/`num_leaves`, lower `learning_rate`, or add data).
