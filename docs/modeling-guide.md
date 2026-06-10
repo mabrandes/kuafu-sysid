@@ -15,6 +15,8 @@ speed, and how much data you need.
 | **Learning curve** | `plot_learning_curve(model)` shows train vs. validation RMSE per round (over/underfitting) | [§ tree models](#tree-models-trees-learning-rate-validation--early-stopping) |
 | **Feature importance** | `plot_feature_importance(model)` for XGB/LGBM (averaged across horizons for LGBM) | `model.feature_importances()` |
 | **Saved diagnostics** | `train()` writes `<model>_{horizon,timeseries,importance,learning_curve}.png` next to each saved model | `save_plots=True` (default) |
+| **Out-of-sample eval** | `evaluate(sel, role, df, start=train_end)` builds features on all of `df` but scores errors only on unseen rows | metrics: RMSE / MAE / **R²** / bias per horizon |
+| **Eval plots** | `plot_horizon_metrics` (RMSE/MAE/R² panels) and `plot_timeseries(..., step=[1,4,24,96])` (forecast at several horizons vs measured) | — |
 | **Progress prints** | `train()` logs data shape, feature count, and per-model RMSE / time / early-stop trees (`verbose=True`) | on by default |
 | **Self-describing store** | each model saved by feature-`hash` + `_config.json` recipe + `_latest.json`, so config variants coexist and pin reproducibly | `store.root` + `sysid_select.yaml` |
 
