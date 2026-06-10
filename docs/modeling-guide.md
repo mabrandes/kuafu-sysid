@@ -159,6 +159,18 @@ the reported per-horizon metrics are honest (no early-stopping leakage).
 step early-stops independently. `Linear`/`KNN` have no boosting rounds, so early
 stopping does not apply to them.
 
+**Watch it live:** `train(cfg, tree_eval_log=N)` streams the train- and
+validation-RMSE every `N` boosting rounds (like XGBoost's `verbose=True`):
+
+```
+[0]   validation_0-rmse:2.805   validation_1-rmse:3.003     # validation_0 = train, _1 = validation
+[20]  validation_0-rmse:1.192   validation_1-rmse:1.580
+[40]  validation_0-rmse:0.587   validation_1-rmse:1.346     # val bottoms out…
+[sysid] XGB: mean RMSE=1.46  (…, early-stopped @ 44 trees)  # …then early stopping fires
+```
+
+`tree_eval_log=0` (default) is silent. LGBM prints per horizon, so it's chattier.
+
 ### Seeing the learning curve
 
 A freshly-trained `Xgb` keeps the train-vs-validation error per round in
