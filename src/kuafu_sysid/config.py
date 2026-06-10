@@ -49,9 +49,12 @@ class TrainConfig:
             if m not in MODEL_REGISTRY:
                 raise ValueError(f"Unknown model {m!r}. Choose from {sorted(MODEL_REGISTRY)}.")
         train = raw.get("train", {}) or {}
+        # `lags` (explicit list) overrides `lag` (count -> 0..lag-1) when non-empty.
+        lags = raw.get("lags") or []
+        lag = list(lags) if lags else raw["lag"]
         return cls(
             target=raw["target"], spec=spec, data_path=d["path"],
-            lag=raw["lag"], horizon=int(raw["horizon"]), dt_min=raw.get("dt_min"),
+            lag=lag, horizon=int(raw["horizon"]), dt_min=raw.get("dt_min"),
             train_start=_datestr(train.get("start")), train_end=_datestr(train.get("end")),
             split=float(train.get("split", -0.1)), models=models,
             time_features=raw.get("time_features", {"enabled": False, "holidays_country": None}),

@@ -24,6 +24,15 @@ Models: `Linear`, `KNN`, `XGB`, `LGBM`, `Persistence_prev_step/day/week`.
 Models are saved under `<store.root>/<target>/` with a feature-hash name, a
 `_config.json` sidecar (full recipe), and a `_latest.json` pointer.
 
+## Choosing lags & time-feature encoding
+
+`lag` is the lag count (`0..lag-1`); set an explicit `lags` list to use only
+selected lags (overrides `lag` when non-empty — e.g. `[0,1,2,95,96,672]` for
+recent + daily + weekly structure). `time_features.encoding` is `cyclical`
+(compact sin/cos) or `onehot` (dummies). For the trade-offs — cyclical vs.
+one-hot per model type, and pruning lags for fast, data-efficient training —
+see **[docs/modeling-guide.md](docs/modeling-guide.md)**.
+
 ## Install
 
 Editable (during development):

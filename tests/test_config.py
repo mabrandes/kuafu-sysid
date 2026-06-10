@@ -33,6 +33,24 @@ def test_train_config_from_yaml(tmp_path):
     assert cfg.train_start == "2025-01-01" and isinstance(cfg.train_start, str)
 
 
+def test_lags_list_overrides_lag_count(tmp_path):
+    p = tmp_path / "t.yaml"
+    p.write_text(
+        "target: t\ndata: {path: x, endog: y}\nhorizon: 2\nlag: 96\n"
+        "lags: [0, 1, 96, 672]\nmodels: [Linear]\n", encoding="utf-8")
+    cfg = TrainConfig.from_yaml(p)
+    assert cfg.lag == [0, 1, 96, 672]   # explicit list wins over lag: 96
+
+
+def test_empty_lags_falls_back_to_lag_count(tmp_path):
+    p = tmp_path / "t.yaml"
+    p.write_text(
+        "target: t\ndata: {path: x, endog: y}\nhorizon: 2\nlag: 96\n"
+        "lags: []\nmodels: [Linear]\n", encoding="utf-8")
+    cfg = TrainConfig.from_yaml(p)
+    assert cfg.lag == 96                # empty list -> use the count
+
+
 def test_train_config_rejects_unknown_model(tmp_path):
     p = tmp_path / "t.yaml"
     p.write_text("target: t\ndata: {path: x, endog: y}\nhorizon: 2\nlag: 2\nmodels: [Nope]\n", encoding="utf-8")
