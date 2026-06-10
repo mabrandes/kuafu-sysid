@@ -22,6 +22,21 @@ def test_xgb_roundtrip(tmp_path):
     assert np.allclose(out, Xgb.load(p).predict(X), atol=1e-5)
 
 
+def test_xgb_uses_validation_early_stopping():
+    X, Y = _xy(n=300)
+    m = Xgb(n_estimators=500).fit(X, Y)
+    # validation tail was held out and monitored -> learning curves + best_iteration
+    assert m.evals_result_ is not None
+    assert {"validation_0", "validation_1"} <= set(m.evals_result_)  # [train, validation]
+    assert m.best_iteration_ is not None and m.best_iteration_ < 500
+
+
+def test_lgbm_uses_validation_early_stopping():
+    X, Y = _xy(n=300)
+    m = Lgbm(n_estimators=500).fit(X, Y)
+    assert m.best_iteration_ is not None and m.best_iteration_ < 500
+
+
 def test_lgbm_roundtrip(tmp_path):
     X, Y = _xy()
     m = Lgbm(n_estimators=10).fit(X, Y)

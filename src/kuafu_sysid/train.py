@@ -71,7 +71,9 @@ def train(cfg: TrainConfig, verbose: bool = True) -> dict[str, pd.DataFrame]:
         pred = model.predict(X_te, endog=df[cfg.spec.endog])
         results[method] = per_horizon_metrics(Y_te, pred)
         dt = time.perf_counter() - t0
-        log(f"[{i}/{n}] {method}: mean RMSE={results[method]['rmse'].mean():.3f}  ({dt:.1f}s)")
+        bi = getattr(model, "best_iteration_", None)   # trees kept after early stopping
+        es = f", early-stopped @ {bi} trees" if bi else ""
+        log(f"[{i}/{n}] {method}: mean RMSE={results[method]['rmse'].mean():.3f}  ({dt:.1f}s{es})")
         if cfg.save:
             store.save(cfg.target, method, model, {**recipe_base, "method": method},
                        cfg.train_start, cfg.train_end)
