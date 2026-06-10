@@ -46,9 +46,21 @@ def load_forecaster(sel: SelectionConfig, role: str) -> FittedForecaster:
     return FittedForecaster(model=model, recipe=recipe)
 
 
-def evaluate(sel: SelectionConfig, role: str, data: pd.DataFrame) -> EvalResult:
+def evaluate(sel: SelectionConfig, role: str, data: pd.DataFrame,
+             start=None, end=None) -> EvalResult:
+    """Evaluate a pinned model on ``data``.
+
+    Features are built on the full ``data`` (so lags have history), but the
+    metrics are scored only over ``[start:end]`` — pass ``start=train_end`` to
+    score on genuinely out-of-sample rows the model never trained on. The
+    returned ``predictions`` cover the full ``data`` regardless of the window.
+    """
     fc = load_forecaster(sel, role)
     _, Y = fc.features(data)
     pred = fc.predict(data)
-    metrics = per_horizon_metrics(Y.reindex(pred.index), pred.to_numpy())
+    yt, yp = Y.reindex(pred.index), pred
+    if start is not None or end is not None:
+        yp = pred.loc[start:end]
+        yt = Y.reindex(yp.index)
+    metrics = per_horizon_metrics(yt, yp.to_numpy())
     return EvalResult(metrics=metrics, predictions=pred)

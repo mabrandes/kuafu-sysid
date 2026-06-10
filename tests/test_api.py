@@ -2,8 +2,24 @@ def test_public_api_exports():
     import kuafu_sysid as ks
     for name in ["train", "evaluate", "load_forecaster", "TrainConfig",
                  "SelectionConfig", "ModelStore", "plot_error_by_horizon",
-                 "plot_learning_curve", "plot_timeseries", "plot_feature_importance"]:
+                 "plot_horizon_metrics", "plot_learning_curve", "plot_timeseries",
+                 "plot_feature_importance"]:
         assert hasattr(ks, name)
+
+
+def test_plot_timeseries_multistep_and_horizon_metrics():
+    import matplotlib
+    matplotlib.use("Agg")
+    import numpy as np, pandas as pd
+    from kuafu_sysid import plot_timeseries, plot_horizon_metrics
+    idx = pd.date_range("2025-01-01", periods=200, freq="h", tz="Europe/Zurich")
+    actual = pd.Series(np.arange(200.0), index=idx)
+    preds = pd.DataFrame({f"y_h_{h}": np.arange(200.0) for h in range(1, 5)}, index=idx)
+    ax = plot_timeseries(actual, preds, step=[1, 4], start="2025-01-01", end="2025-01-05")
+    assert ax is not None
+    m = pd.DataFrame({"rmse": [1.0, 2], "mae": [.5, 1], "r2": [.9, .8]}, index=[1, 2])
+    axes = plot_horizon_metrics(m, which=("rmse", "mae", "r2"))
+    assert len(axes) == 3
 
 
 def test_plot_timeseries_returns_axes():

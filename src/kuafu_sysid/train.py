@@ -34,7 +34,7 @@ def _save_model_plots(art_path, method, metrics_df, model, preds_df, actual) -> 
     import matplotlib.pyplot as plt
 
     from kuafu_sysid.plots import (
-        plot_error_by_horizon, plot_feature_importance, plot_learning_curve, plot_timeseries,
+        plot_feature_importance, plot_horizon_metrics, plot_learning_curve, plot_timeseries,
     )
     d = art_path.parent
     stem = art_path.with_suffix("").name   # method_hash_start_end
@@ -44,8 +44,8 @@ def _save_model_plots(art_path, method, metrics_df, model, preds_df, actual) -> 
         plot_learning_curve(model, ax=ax)
         fig.savefig(d / f"{stem}_learning_curve.png", bbox_inches="tight"); plt.close(fig)
 
-    fig, ax = plt.subplots(figsize=(8, 4))
-    plot_error_by_horizon({method: metrics_df}, ax=ax)
+    axes = plot_horizon_metrics({method: metrics_df}, which=("rmse", "mae", "r2"))  # 3-panel
+    fig = axes[0].figure
     fig.savefig(d / f"{stem}_horizon.png", bbox_inches="tight"); plt.close(fig)
 
     if len(preds_df):

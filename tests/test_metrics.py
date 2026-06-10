@@ -10,6 +10,7 @@ def test_per_horizon_metrics_perfect():
     m = per_horizon_metrics(Y, pred)
     assert list(m.index) == [1, 2]                # horizon steps
     assert (m["rmse"] == 0).all() and (m["mae"] == 0).all()
+    assert np.allclose(m["r2"], 1.0)              # perfect fit -> R² = 1
 
 
 def test_per_horizon_metrics_known_error():

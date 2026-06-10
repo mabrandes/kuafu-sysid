@@ -39,3 +39,12 @@ def test_evaluate_returns_metrics(tmp_path):
     res = evaluate(sel, "price", df)
     assert list(res.metrics.index) == [1, 2, 3, 4]
     assert (res.metrics["rmse"] >= 0).all()
+    assert "r2" in res.metrics.columns
+
+
+def test_evaluate_metric_window_scores_subset(tmp_path):
+    df, sel = _setup(tmp_path)
+    cut = df.index[len(df) // 2]
+    res = evaluate(sel, "price", df, start=cut)          # metrics only after `cut`
+    assert int(res.metrics["n"].iloc[0]) < len(df)        # fewer rows scored
+    assert res.predictions.index.equals(df.index)         # predictions still cover all data
