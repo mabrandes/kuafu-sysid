@@ -87,39 +87,39 @@ def add_time_features(index: pd.DatetimeIndex, time_features: dict | None) -> pd
     r = resolve_time_features(time_features)
     idx = pd.DatetimeIndex(index)
     cyc = r["encoding"] == "cyclical"
-    out = pd.DataFrame(index=idx)
+    cols: dict[str, np.ndarray] = {}
 
     if r["time_of_day"]:
         if cyc:
             hour = idx.hour + idx.minute / 60.0
-            out["hour_sin"] = np.sin(2 * np.pi * hour / 24.0)
-            out["hour_cos"] = np.cos(2 * np.pi * hour / 24.0)
+            cols["hour_sin"] = np.sin(2 * np.pi * hour / 24.0)
+            cols["hour_cos"] = np.cos(2 * np.pi * hour / 24.0)
         else:
             for h in range(24):
-                out[f"tod_{h}"] = (idx.hour == h).astype(int)
+                cols[f"tod_{h}"] = (idx.hour == h).astype(int)
     if r["day_of_week"]:
         dow = idx.dayofweek
         if cyc:
-            out["dow_sin"] = np.sin(2 * np.pi * dow / 7.0)
-            out["dow_cos"] = np.cos(2 * np.pi * dow / 7.0)
+            cols["dow_sin"] = np.sin(2 * np.pi * dow / 7.0)
+            cols["dow_cos"] = np.cos(2 * np.pi * dow / 7.0)
         else:
             for d in range(7):
-                out[f"dow_{d}"] = (dow == d).astype(int)
+                cols[f"dow_{d}"] = (dow == d).astype(int)
     if r["day_of_year"]:
         if cyc:
             doy = idx.dayofyear
-            out["doy_sin"] = np.sin(2 * np.pi * doy / 365.25)
-            out["doy_cos"] = np.cos(2 * np.pi * doy / 365.25)
+            cols["doy_sin"] = np.sin(2 * np.pi * doy / 365.25)
+            cols["doy_cos"] = np.cos(2 * np.pi * doy / 365.25)
         else:
             for m in range(1, 13):
-                out[f"month_{m}"] = (idx.month == m).astype(int)
+                cols[f"month_{m}"] = (idx.month == m).astype(int)
     if r["holidays_country"]:
         import holidays as _hol
         cal = _hol.country_holidays(r["holidays_country"], years=sorted(set(idx.year)))
-        out["is_holiday"] = idx.normalize().isin(
+        cols["is_holiday"] = idx.normalize().isin(
             pd.to_datetime(list(cal.keys())).tz_localize(idx.tz)
         ).astype(int)
-    return out
+    return pd.DataFrame(cols, index=idx)  # built at once (no fragmentation)
 
 
 def build_features(df: pd.DataFrame, spec: FeatureSpec, lag, horizon: int, dt_min,
@@ -132,30 +132,27 @@ def build_features(df: pd.DataFrame, spec: FeatureSpec, lag, horizon: int, dt_mi
     Rows are NOT dropped here; downstream model adapters handle NaN per their kind.
     """
     lags = normalize_lags(lag)
-    X = pd.DataFrame(index=df.index)
+    cols: dict[str, pd.Series] = {}
 
-    # endog lags
-    for k in lags:
-        X[f"{spec.endog}_lag_{k}"] = df[spec.endog].shift(k)
-    # exog_with_lag lags
-    for col in spec.exog_with_lag:
+    for k in lags:                                  # endog lags
+        cols[f"{spec.endog}_lag_{k}"] = df[spec.endog].shift(k)
+    for col in spec.exog_with_lag:                  # exog lags
         for k in lags:
-            X[f"{col}_lag_{k}"] = df[col].shift(k)
-    # current-step exog
-    for col in spec.exog:
-        X[col] = df[col]
-    # known-ahead exog aligned to future slots
-    for col in spec.forecast_exog:
+            cols[f"{col}_lag_{k}"] = df[col].shift(k)
+    for col in spec.exog:                           # current-step exog
+        cols[col] = df[col]
+    for col in spec.forecast_exog:                  # known-ahead exog (future slots)
         for h in range(horizon):
-            X[f"{col}_fc_{h}"] = df[col].shift(-h)
-    # time features (selected components + encoding; empty if none enabled)
+            cols[f"{col}_fc_{h}"] = df[col].shift(-h)
+
+    # build the matrix at once to avoid DataFrame fragmentation, then append time features
+    X = pd.DataFrame(cols, index=df.index)
     tf = add_time_features(df.index, time_features)
     if not tf.empty:
-        X = X.join(tf)
+        X = pd.concat([X, tf], axis=1)
 
-    # targets
-    Y = pd.DataFrame(index=df.index)
-    for h in range(1, horizon + 1):
-        Y[f"{spec.endog}_h_{h}"] = df[spec.endog].shift(-h)
-
+    Y = pd.DataFrame(
+        {f"{spec.endog}_h_{h}": df[spec.endog].shift(-h) for h in range(1, horizon + 1)},
+        index=df.index,
+    )
     return X, Y
