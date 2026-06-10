@@ -17,6 +17,8 @@ speed, and how much data you need.
 | **Saved diagnostics** | `train()` writes `<model>_{horizon,timeseries,importance,learning_curve}.png` next to each saved model | `save_plots=True` (default) |
 | **Out-of-sample eval** | `evaluate(sel, role, df, start=train_end)` builds features on all of `df` but scores errors only on unseen rows | metrics: RMSE / MAE / **R²** / bias per horizon |
 | **Eval plots** | `plot_horizon_metrics` (RMSE/MAE/R² panels) and `plot_timeseries(..., step=[1,4,24,96])` (forecast at several horizons vs measured) | — |
+| **LGBM quantile band** | LGBM trains a configurable band (always incl. 0.5 median); `predict()` = median, `predict_quantiles()` = all | `quantiles: [0.1, 0.9]` in the config |
+| **Band / trajectory plots** | `plot_forecast_band` (median + band at one step) and `plot_forecast_origin` (full forecast issued at a fixed time, e.g. 08:00) | — |
 | **Progress prints** | `train()` logs data shape, feature count, and per-model RMSE / time / early-stop trees (`verbose=True`) | on by default |
 | **Self-describing store** | each model saved by feature-`hash` + `_config.json` recipe + `_latest.json`, so config variants coexist and pin reproducibly | `store.root` + `sysid_select.yaml` |
 
