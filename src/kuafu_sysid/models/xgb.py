@@ -27,7 +27,7 @@ class Xgb(Forecaster):
         self._model.fit(X.loc[m].to_numpy(float), Y.loc[m].to_numpy(float))
         return self
 
-    def predict(self, X: pd.DataFrame) -> np.ndarray:
+    def predict(self, X: pd.DataFrame, endog=None) -> np.ndarray:
         return self._model.predict(X.reindex(columns=self._columns).to_numpy(float))
 
     def save(self, path: Path) -> None:

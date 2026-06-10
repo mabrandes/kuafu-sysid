@@ -35,7 +35,7 @@ class Lgbm(Forecaster):
             self._models.append(est)
         return self
 
-    def predict(self, X: pd.DataFrame) -> np.ndarray:
+    def predict(self, X: pd.DataFrame, endog=None) -> np.ndarray:
         Xv = X.reindex(columns=self._columns).to_numpy(float)
         return np.column_stack([est.predict(Xv) for est in self._models])
 

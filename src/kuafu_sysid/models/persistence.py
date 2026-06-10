@@ -6,9 +6,9 @@ period_steps controls which baseline:
   steps_per_week       -> prev_week (same slot last week)
 
 For horizon h (1-indexed) the forecast for t+h is the endog value at
-t + h - period, i.e. column {endog}_lag_{period - h} when available; for
-(period - h) < 0 or a missing column it falls back to {endog}_lag_0.
-Requires the endog lag columns to be present in X (config lag >= period - 1).
+t + h - period == endog.shift(max(period - h, 0)) evaluated at t. The
+forecast reads the endog series directly (passed to predict), so it works at
+any configured lag (no need to inflate lag to cover a weekly period).
 """
 from __future__ import annotations
 
@@ -33,14 +33,15 @@ class Persistence(Forecaster):
     def fit(self, X: pd.DataFrame, Y: pd.DataFrame) -> "Persistence":
         return self  # nothing to learn
 
-    def predict(self, X: pd.DataFrame) -> np.ndarray:
+    def predict(self, X: pd.DataFrame, endog: pd.Series | None = None) -> np.ndarray:
+        if endog is None:
+            raise ValueError(
+                "Persistence baselines need the endog series; call predict(X, endog=...)."
+            )
         cols = []
         for h in range(1, self.horizon + 1):
-            k = self.period_steps - h
-            name = f"{self.endog}_lag_{k}"
-            if k < 0 or name not in X.columns:
-                name = f"{self.endog}_lag_0"
-            cols.append(X[name].to_numpy(float))
+            k = max(self.period_steps - h, 0)  # h > period -> repeat the origin value
+            cols.append(endog.shift(k).reindex(X.index).to_numpy(float))
         return np.column_stack(cols)
 
     def save(self, path: Path) -> None:

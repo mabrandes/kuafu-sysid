@@ -29,7 +29,7 @@ class FittedForecaster:
     def predict(self, df: pd.DataFrame) -> pd.DataFrame:
         X, _ = self.features(df)
         X = X.reindex(columns=self.recipe["feature_columns"])
-        pred = self.model.predict(X)
+        pred = self.model.predict(X, endog=df[self.recipe["endog"]])
         return pd.DataFrame(pred, index=X.index, columns=self.recipe["target_columns"])
 
 

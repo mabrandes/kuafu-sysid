@@ -34,18 +34,28 @@ def test_lgbm_roundtrip(tmp_path):
 
 def test_persistence_prev_step_repeats_last_value():
     idx = pd.date_range("2025-01-01", periods=10, freq="h", tz="Europe/Zurich")
-    X = pd.DataFrame({"y_lag_0": np.arange(10.0)}, index=idx)
+    endog = pd.Series(np.arange(10.0), index=idx)
+    X = pd.DataFrame(index=idx)  # persistence ignores X, reads endog
     m = Persistence(period_steps=1, horizon=3, endog="y")
-    out = m.predict(X)
+    out = m.predict(X, endog=endog)
     assert out.shape == (10, 3)
-    assert np.array_equal(out[5], [5.0, 5.0, 5.0])  # last value repeated across horizon
+    assert np.array_equal(out[5], [5.0, 5.0, 5.0])  # origin value repeated across horizon
 
 
-def test_persistence_prev_day_uses_offset_lag():
+def test_persistence_prev_day_uses_offset():
     idx = pd.date_range("2025-01-01", periods=50, freq="h", tz="Europe/Zurich")
-    cols = {f"y_lag_{k}": np.full(50, float(k)) for k in range(24)}
-    X = pd.DataFrame(cols, index=idx)
+    endog = pd.Series(np.arange(50.0), index=idx)  # endog[i] == i
     m = Persistence(period_steps=24, horizon=2, endog="y")
-    out = m.predict(X)
-    # h=1 -> lag 23 (value 23), h=2 -> lag 22 (value 22)
-    assert np.array_equal(out[0], [23.0, 22.0])
+    out = m.predict(pd.DataFrame(index=idx), endog=endog)
+    # at origin position 30: h=1 -> t+1-24 = pos 7; h=2 -> t+2-24 = pos 8
+    assert np.array_equal(out[30], [7.0, 8.0])
+
+
+def test_persistence_prev_week_works_without_huge_lag():
+    # weekly period (168 h) with no lag columns at all — reads endog directly
+    idx = pd.date_range("2025-01-01", periods=400, freq="h", tz="Europe/Zurich")
+    endog = pd.Series(np.arange(400.0), index=idx)
+    m = Persistence(period_steps=168, horizon=2, endog="y")
+    out = m.predict(pd.DataFrame(index=idx), endog=endog)
+    # at origin position 200: h=1 -> 200+1-168 = pos 33; h=2 -> pos 34
+    assert np.array_equal(out[200], [33.0, 34.0])

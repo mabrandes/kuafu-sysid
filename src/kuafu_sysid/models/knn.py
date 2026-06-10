@@ -27,7 +27,7 @@ class Knn(Forecaster):
         self._model.fit(X.loc[mask].to_numpy(float), Y.loc[mask].to_numpy(float))
         return self
 
-    def predict(self, X: pd.DataFrame) -> np.ndarray:
+    def predict(self, X: pd.DataFrame, endog=None) -> np.ndarray:
         Xv = X.reindex(columns=self._columns)
         complete = Xv.notna().all(axis=1).to_numpy()
         out = np.full((len(Xv), self._n_out), np.nan)

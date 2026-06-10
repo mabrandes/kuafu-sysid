@@ -11,7 +11,7 @@ def _frame(n=200, freq="h"):
 
 
 def test_add_time_features_columns():
-    tf = add_time_features(_frame().index, holidays_country="CH")
+    tf = add_time_features(_frame().index, {"enabled": True, "holidays_country": "CH"})
     for c in ["hour_sin", "hour_cos", "doy_sin", "doy_cos", "dow_sin", "dow_cos", "is_holiday"]:
         assert c in tf.columns
     assert tf["is_holiday"].iloc[0] == 1  # 2025-01-01 is a CH holiday

@@ -51,7 +51,7 @@ def train(cfg: TrainConfig) -> dict[str, pd.DataFrame]:
         model = get_model(method, horizon=cfg.horizon, endog=cfg.spec.endog,
                           steps_per_day=spd, steps_per_week=spw)
         model.fit(X_tr, Y_tr)
-        pred = model.predict(X_te)
+        pred = model.predict(X_te, endog=df[cfg.spec.endog])
         results[method] = per_horizon_metrics(Y_te, pred)
         if cfg.save:
             store.save(cfg.target, method, model, {**recipe_base, "method": method},
