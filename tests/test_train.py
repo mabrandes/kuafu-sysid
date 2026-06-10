@@ -37,10 +37,13 @@ def test_train_writes_artefacts_and_returns_metrics(tmp_path):
     assert (d / "_latest.json").exists()
     # plots saved next to the models (save_plots default True)
     pngs = [f.name for f in d.glob("*.png")]
-    assert any(n.startswith("XGB_") and n.endswith("_importance.png") for n in pngs)  # tree-only
-    assert any(n.endswith("_horizon.png") for n in pngs)
-    assert any(n.endswith("_timeseries.png") for n in pngs)
+    # per-model: feature importance (tree-only) + XGB learning curve
+    assert any(n.startswith("XGB_") and n.endswith("_importance.png") for n in pngs)
+    assert any(n.startswith("XGB_") and n.endswith("_learning_curve.png") for n in pngs)
     assert not any(n.startswith("Persistence") and n.endswith("_importance.png") for n in pngs)
+    # combined comparison plots (one per target, all models overlaid)
+    assert "t_horizon_compare.png" in pngs
+    assert "t_timeseries_compare.png" in pngs
 
 
 def test_train_no_plots_when_disabled(tmp_path):

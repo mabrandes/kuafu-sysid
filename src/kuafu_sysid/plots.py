@@ -90,6 +90,30 @@ def plot_timeseries(actual: pd.Series, predictions: pd.DataFrame, step=1,
     return ax
 
 
+def plot_timeseries_compare(actual: pd.Series, preds_by_model: dict[str, pd.DataFrame],
+                            step: int = 1, start=None, end=None, ax=None):
+    """Overlay several models' forecasts at one horizon ``step`` vs. the measured
+    series (one line per model). ``preds_by_model`` maps a label to that model's
+    wide prediction frame (as returned by ``evaluate``/``load_forecaster``)."""
+    if ax is None:
+        _, ax = plt.subplots(figsize=(11, 4))
+    a = actual if (start is None and end is None) else actual.loc[start:end]
+    ax.plot(a.index, a.to_numpy(), label="measured", lw=1.8, color="black",
+            zorder=len(preds_by_model) + 2)
+    ylabel = ""
+    for name, preds in preds_by_model.items():
+        dt = preds.index.to_series().diff().median()
+        s = pd.Series(preds.iloc[:, step - 1].to_numpy(), index=preds.index + step * dt)
+        sp = s if (start is None and end is None) else s.loc[start:end]
+        ax.plot(sp.index, sp.to_numpy(), lw=1.0, alpha=0.85, label=name)
+        ylabel = preds.columns[step - 1].rsplit("_h_", 1)[0]
+    ax.set_ylabel(ylabel)
+    ax.set_title(f"Measured vs. forecast — horizon step {step}")
+    ax.legend(fontsize=8)
+    ax.grid(alpha=0.3)
+    return ax
+
+
 def plot_learning_curve(model, ax=None):
     """Train vs. validation RMSE per boosting round for an XGB model.
 

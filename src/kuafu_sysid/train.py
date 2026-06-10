@@ -27,15 +27,14 @@ def _split(X, Y, split):
     return X.iloc[:cut], Y.iloc[:cut], X.iloc[cut:], Y.iloc[cut:]
 
 
-def _save_model_plots(art_path, method, metrics_df, model, preds_df, actual) -> None:
-    """Save horizon / timeseries / feature-importance PNGs next to the artefact."""
+def _save_model_plots(art_path, model) -> None:
+    """Per-model PNGs next to the artefact: learning curve (XGB) + feature
+    importance (tree models). Cross-model comparisons live in _save_compare_plots."""
     import matplotlib
     matplotlib.use("Agg")   # headless: write files, never pop a window
     import matplotlib.pyplot as plt
 
-    from kuafu_sysid.plots import (
-        plot_feature_importance, plot_horizon_metrics, plot_learning_curve, plot_timeseries,
-    )
+    from kuafu_sysid.plots import plot_feature_importance, plot_learning_curve
     d = art_path.parent
     stem = art_path.with_suffix("").name   # method_hash_start_end
 
@@ -44,21 +43,32 @@ def _save_model_plots(art_path, method, metrics_df, model, preds_df, actual) -> 
         plot_learning_curve(model, ax=ax)
         fig.savefig(d / f"{stem}_learning_curve.png", bbox_inches="tight"); plt.close(fig)
 
-    axes = plot_horizon_metrics({method: metrics_df}, which=("rmse", "mae", "r2"))  # 3-panel
-    fig = axes[0].figure
-    fig.savefig(d / f"{stem}_horizon.png", bbox_inches="tight"); plt.close(fig)
-
-    if len(preds_df):
-        w0 = preds_df.index.min()
-        w1 = min(w0 + pd.Timedelta(days=14), preds_df.index.max())   # readable window
-        fig, ax = plt.subplots(figsize=(11, 4))
-        plot_timeseries(actual, preds_df, step=1, start=w0, end=w1, ax=ax)
-        fig.savefig(d / f"{stem}_timeseries.png", bbox_inches="tight"); plt.close(fig)
-
     if model.feature_importances() is not None:   # tree models only
         fig, ax = plt.subplots(figsize=(8, 6))
         plot_feature_importance(model, ax=ax)
         fig.savefig(d / f"{stem}_importance.png", bbox_inches="tight"); plt.close(fig)
+
+
+def _save_compare_plots(d, target, results, preds_by_method, actual,
+                        step: int, days: int = 4) -> None:
+    """One combined horizon plot (RMSE/MAE/R², all models) and one combined
+    timeseries plot (all models at horizon `step`, over a short window)."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    from kuafu_sysid.plots import plot_horizon_metrics, plot_timeseries_compare
+
+    axes = plot_horizon_metrics(results, which=("rmse", "mae", "r2"))   # all models overlaid
+    fig = axes[0].figure
+    fig.savefig(d / f"{target}_horizon_compare.png", bbox_inches="tight"); plt.close(fig)
+
+    any_preds = next(iter(preds_by_method.values()))
+    w0 = any_preds.index.min()
+    w1 = min(w0 + pd.Timedelta(days=days), any_preds.index.max())   # fewer days = clearer
+    fig, ax = plt.subplots(figsize=(12, 4.5))
+    plot_timeseries_compare(actual, preds_by_method, step=step, start=w0, end=w1, ax=ax)
+    fig.savefig(d / f"{target}_timeseries_compare.png", bbox_inches="tight"); plt.close(fig)
 
 
 def train(cfg: TrainConfig, verbose: bool = True,
@@ -100,6 +110,7 @@ def train(cfg: TrainConfig, verbose: bool = True,
     }
     store = ModelStore(cfg.store_root)
     results: dict[str, pd.DataFrame] = {}
+    preds_by_method: dict[str, pd.DataFrame] = {}
     n = len(cfg.models)
     for i, method in enumerate(cfg.models, 1):
         log(f"[{i}/{n}] training {method} ...")
@@ -109,6 +120,7 @@ def train(cfg: TrainConfig, verbose: bool = True,
         model.fit(X_tr, Y_tr)
         pred = model.predict(X_te, endog=df[cfg.spec.endog])
         results[method] = per_horizon_metrics(Y_te, pred)
+        preds_by_method[method] = pd.DataFrame(pred, index=X_te.index, columns=list(Y.columns))
         dt = time.perf_counter() - t0
         bi = getattr(model, "best_iteration_", None)   # trees kept after early stopping
         es = f", early-stopped @ {bi} trees" if bi else ""
@@ -117,9 +129,11 @@ def train(cfg: TrainConfig, verbose: bool = True,
             art = store.save(cfg.target, method, model, {**recipe_base, "method": method},
                              cfg.train_start, cfg.train_end)
             if save_plots:
-                preds_df = pd.DataFrame(pred, index=X_te.index, columns=list(Y.columns))
-                _save_model_plots(art, method, results[method], model,
-                                  preds_df, df[cfg.spec.endog])
+                _save_model_plots(art, model)
+    if cfg.save and save_plots and results:
+        step12h = max(1, min(int(round(12 * 60 / dt_min)), cfg.horizon))   # 12 h ahead
+        _save_compare_plots(store.root / cfg.target, cfg.target, results,
+                            preds_by_method, df[cfg.spec.endog], step=step12h)
     log(f"done: {n} model(s) "
         + ("saved to " + str(store.root / cfg.target) if cfg.save else "(not saved)"))
     return results
