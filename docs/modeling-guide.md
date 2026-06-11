@@ -21,6 +21,8 @@ speed, and how much data you need.
 | **Band / trajectory plots** | `plot_forecast_band` (median + band at one step) and `plot_forecast_origin` (full forecast issued at a fixed time, e.g. 08:00) | — |
 | **Progress prints** | `train()` logs data shape, feature count, and per-model RMSE / time / early-stop trees (`verbose=True`) | on by default |
 | **Self-describing store** | each model saved by feature-`hash` + `_config.json` recipe + `_latest.json`, so config variants coexist and pin reproducibly | `store.root` + `sysid_select.yaml` |
+| **Working resolution / downsampling** | `dt_min` is the target step; when coarser than the data it downsamples before features (`resample_agg`: `sum` for energy, `mean` for rates) | `dt_min`, `resample_agg` |
+| **Non-negative / clipped output** | floor predictions (e.g. PV ≥ 0) at train, eval, quantiles, and saved plots | `clip_min: 0` |
 
 ## Model formulation (direct multi-step)
 

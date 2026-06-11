@@ -10,7 +10,10 @@ data:
   exog: [load]                   # current-step driver (known at origin)
   exog_with_lag: [load]          # also add lagged copies of load
   forecast_exog: [load_fc]       # known-ahead forecast, aligned to future slots
-dt_min: 60                       # hourly demo
+dt_min: 60                       # working resolution; if coarser than the data's native
+                                 # step the series is downsampled to it before features
+# resample_agg: {y: sum}         # aggregation when downsampling: sum for accumulated
+                                 # quantities (energy), mean (default) for rates/levels
 lag: 48                          # lag count: used only when `lags` is empty -> 0..47
 lags: [0, 1, 2, 24, 48]          # explicit selection (recent + daily) -> overrides `lag`
 horizon: 24                      # 1 day ahead
