@@ -40,6 +40,7 @@ class TrainConfig:
     models: list[str] = field(default_factory=list)
     time_features: dict = field(default_factory=lambda: {"enabled": False, "holidays_country": None})
     quantiles: tuple = ()       # LGBM uncertainty band, e.g. (0.1, 0.9); 0.5 always added
+    linear_cv: bool = True      # Linear: cross-validate alpha (RidgeCV) or use a fixed Ridge
     store_root: str = "models"
     save: bool = True
 
@@ -78,6 +79,7 @@ class TrainConfig:
             split=float(train.get("split", -0.1)), models=models,
             time_features=raw.get("time_features", {"enabled": False, "holidays_country": None}),
             quantiles=tuple(raw.get("quantiles") or ()),
+            linear_cv=bool(raw.get("linear_cv", True)),
             store_root=(raw.get("store", {}) or {}).get("root", "models"),
             save=bool(raw.get("save", True)),
         )

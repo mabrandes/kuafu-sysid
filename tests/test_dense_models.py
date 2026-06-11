@@ -39,14 +39,14 @@ def test_linear_save_load_roundtrip(tmp_path):
 
 def test_linear_cross_validates_alpha_by_default():
     X, Y = _xy(h=3)
-    m = Linear().fit(X, Y)                 # alpha=None -> RidgeCV per horizon
+    m = Linear().fit(X, Y)                 # cv=True (default) -> RidgeCV per horizon
     assert m.alpha_ is not None and len(m.alpha_) == 3
     assert all(a in (0.01, 0.1, 1.0, 10.0, 100.0) for a in m.alpha_)
 
 
-def test_linear_fixed_alpha_skips_cv():
+def test_linear_cv_off_skips_cv():
     X, Y = _xy()
-    m = Linear(alpha=1.0).fit(X, Y)        # explicit alpha -> no CV
+    m = Linear(cv=False, alpha=1.0).fit(X, Y)   # cv disabled -> fixed Ridge, no CV
     assert m.alpha_ is None
 
 

@@ -133,7 +133,7 @@ def train(cfg: TrainConfig, verbose: bool = True,
         t0 = time.perf_counter()
         model = get_model(method, horizon=cfg.horizon, endog=cfg.spec.endog,
                           steps_per_day=spd, steps_per_week=spw, eval_log=tree_eval_log,
-                          quantiles=cfg.quantiles)
+                          quantiles=cfg.quantiles, cv=cfg.linear_cv)
         model.fit(X_tr, Y_tr)
         pred = model.predict(X_te, endog=df[cfg.spec.endog])
         results[method] = per_horizon_metrics(Y_te, pred)

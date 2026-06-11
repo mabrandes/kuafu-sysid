@@ -20,28 +20,32 @@ from kuafu_sysid.models.base import Forecaster
 class Linear(Forecaster):
     EXT = "joblib"
 
-    def __init__(self, alpha: float | None = None,
-                 alphas=(0.01, 0.1, 1.0, 10.0, 100.0), cv: int = 5, **_ignored):
-        # alpha=None -> cross-validate alpha over `alphas` with `cv` folds (RidgeCV);
-        # alpha=<float> -> fixed Ridge (no CV).
+    def __init__(self, alpha: float = 1.0, cv: bool = True,
+                 alphas=(0.01, 0.1, 1.0, 10.0, 100.0), cv_folds: int | None = None,
+                 **_ignored):
+        # cv=True  -> cross-validate alpha over `alphas` (RidgeCV). `cv_folds=None`
+        #             uses scikit-learn's efficient leave-one-out (GCV) — much
+        #             faster than k-fold across many horizons; set an int for k-fold.
+        # cv=False -> fixed Ridge(alpha) (no CV; fastest).
+        self.cv = bool(cv)
         self.alpha = alpha
         self.alphas = tuple(alphas)
-        self.cv = cv
-        base = Ridge(alpha=alpha) if alpha is not None else RidgeCV(alphas=self.alphas, cv=cv)
+        self.cv_folds = cv_folds
+        base = RidgeCV(alphas=self.alphas, cv=cv_folds) if self.cv else Ridge(alpha=alpha)
         self._model = MultiOutputRegressor(base)
         self._columns: list[str] | None = None
         self._n_out: int = 0
-        self.alpha_: list[float] | None = None   # CV-chosen alpha per horizon (if RidgeCV)
+        self.alpha_: list[float] | None = None   # CV-chosen alpha per horizon (if cv)
 
     def fit(self, X: pd.DataFrame, Y: pd.DataFrame) -> "Linear":
         """Fit one Ridge per horizon. X: (n_samples, n_features); Y: (n_samples,
         horizon H). Rows with any NaN in X or Y are dropped (dense model). With
-        ``alpha=None`` each horizon's alpha is selected by ``cv``-fold CV."""
+        ``cv=True`` each horizon's alpha is selected by cross-validation."""
         self._columns = list(X.columns)
         self._n_out = Y.shape[1]
         mask = X.notna().all(axis=1) & Y.notna().all(axis=1)
         self._model.fit(X.loc[mask].to_numpy(float), Y.loc[mask].to_numpy(float))
-        if self.alpha is None:   # record the CV-selected alpha per output
+        if self.cv:   # record the CV-selected alpha per output
             self.alpha_ = [float(est.alpha_) for est in self._model.estimators_]
         return self
 
