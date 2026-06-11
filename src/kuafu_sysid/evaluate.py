@@ -24,12 +24,14 @@ class FittedForecaster:
                            forecast_exog=tuple(r["forecast_exog"]))
 
     def _prep(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Apply the same downsampling used at training (if any), so eval features
-        match the model's resolution."""
-        rm = self.recipe.get("resample_min")
-        if rm:
-            from kuafu_sysid.features import resample_df
-            df = resample_df(df, rm, self.recipe.get("resample_agg", "mean"))
+        """Match the training resolution: downsample to the recipe's dt_min when the
+        eval data is finer (no-op if it's already at that step)."""
+        dt = self.recipe.get("dt_min")
+        if dt:
+            native = round(df.index.to_series().diff().median().total_seconds() / 60)
+            if native < dt:
+                from kuafu_sysid.features import resample_df
+                df = resample_df(df, dt, self.recipe.get("resample_agg", "mean"))
         return df
 
     def features(self, df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:

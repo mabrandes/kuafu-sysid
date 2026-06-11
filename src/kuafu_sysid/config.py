@@ -42,7 +42,8 @@ class TrainConfig:
     quantiles: tuple = ()       # LGBM uncertainty band, e.g. (0.1, 0.9); 0.5 always added
     linear_cv: bool = True      # Linear: cross-validate alpha (RidgeCV) or use a fixed Ridge
     clip_min: float | None = None   # clamp predictions to >= clip_min (e.g. 0 for PV); None = off
-    resample_min: int | None = None  # downsample data to this step before training; None = native
+    # dt_min is the target working resolution: when coarser than the data's native
+    # step the series is downsampled to it before features (resample_agg = the rule).
     resample_agg: object = "mean"    # "mean"/"sum" for all, or {column: rule} (default mean)
     store_root: str = "models"
     save: bool = True
@@ -84,7 +85,6 @@ class TrainConfig:
             quantiles=tuple(raw.get("quantiles") or ()),
             linear_cv=bool(raw.get("linear_cv", True)),
             clip_min=raw.get("clip_min"),
-            resample_min=raw.get("resample_min"),
             resample_agg=raw.get("resample_agg", "mean"),
             store_root=(raw.get("store", {}) or {}).get("root", "models"),
             save=bool(raw.get("save", True)),
