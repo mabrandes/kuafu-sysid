@@ -207,8 +207,15 @@ def plot_issue_profile(actual: pd.Series, predictions: pd.DataFrame, hour: int =
     ax.plot(lead_h, np.nanmean(fc, axis=0), color="tab:blue", lw=1.4, marker=".", label="forecast (mean)")
     ax.set_xlabel(f"hours after {hour:02d}:{minute:02d}")
     ax.set_ylabel(predictions.columns[0].rsplit("_h_", 1)[0])
+    # metrics over all (day, lead) pairs in the window
+    m = ~(np.isnan(fc) | np.isnan(meas))
+    err, a = (fc - meas)[m], meas[m]
+    rmse, mae = float(np.sqrt(np.mean(err ** 2))), float(np.mean(np.abs(err)))
+    ss_tot = float(np.sum((a - a.mean()) ** 2))
+    r2 = 1.0 - float(np.sum(err ** 2)) / ss_tot if ss_tot > 0 else float("nan")
     ax.set_title(f"Mean {hour:02d}:{minute:02d} day-ahead profile "
-                 f"(n={len(origins)} days, {_fmt_period((origins.min(), origins.max()))})")
+                 f"(n={len(origins)} days, {_fmt_period((origins.min(), origins.max()))})\n"
+                 f"RMSE={rmse:.2f}  MAE={mae:.2f}  R²={r2:.2f}")
     ax.legend(fontsize=8)
     ax.grid(alpha=0.3)
     return ax
