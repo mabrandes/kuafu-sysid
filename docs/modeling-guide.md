@@ -22,6 +22,41 @@ speed, and how much data you need.
 | **Progress prints** | `train()` logs data shape, feature count, and per-model RMSE / time / early-stop trees (`verbose=True`) | on by default |
 | **Self-describing store** | each model saved by feature-`hash` + `_config.json` recipe + `_latest.json`, so config variants coexist and pin reproducibly | `store.root` + `sysid_select.yaml` |
 
+## Model formulation (direct multi-step)
+
+For a horizon of `N` steps (`horizon`), the whole horizon is predicted **at once**
+from information available at the forecast origin `t`:
+
+```
+[ y[t+1], ..., y[t+N] ] = f( u[t-m..t],  d[t..t+N],  y[t-k..t] )
+```
+
+- **`y` — endog** (target): recent history `y[t-k..t]` enters as lag features.
+- **`u` — exog** (measured drivers): current `u[t]` and optionally lagged `u[t-m..t]`.
+- **`d` — known-ahead disturbances / weather forecasts**: aligned to the *future*
+  delivery slots `d[t..t+N]` (e.g. an irradiance forecast already known for tomorrow).
+- plus deterministic **calendar/time features** of the timestamp.
+
+All `N` targets share the **same input feature vector** built at origin `t`
+(**direct** multi-step, not an iterated one-step model). The literal picture is
+"horizon-number of separate models" — one regressor per step `h`.
+
+| Symbol | Config field | Feature columns |
+|--------|--------------|-----------------|
+| `y[t-k..t]` | `endog`, `lag`/`lags` | `{endog}_lag_0 … _lag_k` |
+| `u[t]` | `exog` | `{col}` |
+| `u[t-m..t]` | `exog_with_lag` (+ `lag`/`lags`) | `{col}_lag_0 … _lag_m` |
+| `d[t..t+N]` | `forecast_exog` | `{col}_fc_0 … _fc_{N-1}` |
+| calendar | `time_features` | `hour_sin/cos`, `dow_*`, `doy_*`/`month_*`, `is_holiday` |
+| `y[t+1..t+N]` | `horizon` (= N) | `{endog}_h_1 … _h_N` |
+
+How each model realises it: `Linear`(Ridge/RidgeCV) and `KNN` use a
+`MultiOutputRegressor` → **N estimators**, one per step, sharing the input;
+`LGBM` trains **N boosters per quantile**; `XGB` uses a **single multi-output
+booster** emitting the whole N-vector; `Persistence_*` is not learned
+(`y[t+h] = y[t+h-period]`). `d` is perfect-foresight at training (future column
+shifted to the origin); at inference you supply the real forecast for those slots.
+
 ## Time-feature encoding: cyclical vs. one-hot
 
 `time_features.encoding` controls how calendar components (hour-of-day,
