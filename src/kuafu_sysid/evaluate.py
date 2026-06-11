@@ -80,6 +80,17 @@ def load_forecaster(sel: SelectionConfig, role: str) -> FittedForecaster:
     return FittedForecaster(model=model, recipe=recipe)
 
 
+def _eval_fc(fc: FittedForecaster, data: pd.DataFrame, start, end) -> EvalResult:
+    """Score one fitted forecaster on ``data`` over the ``[start:end]`` window."""
+    _, Y = fc.features(data)
+    pred = fc.predict(data)
+    yp = pred if (start is None and end is None) else pred.loc[start:end]
+    yt = Y.reindex(yp.index)
+    metrics = per_horizon_metrics(yt, yp.to_numpy())
+    period = (yp.index.min(), yp.index.max()) if len(yp) else None
+    return EvalResult(metrics=metrics, predictions=pred, period=period)
+
+
 def evaluate(sel: SelectionConfig, role: str, data: pd.DataFrame,
              start=None, end=None) -> EvalResult:
     """Evaluate a pinned model on ``data``.
@@ -88,14 +99,26 @@ def evaluate(sel: SelectionConfig, role: str, data: pd.DataFrame,
     metrics are scored only over ``[start:end]`` — pass ``start=train_end`` to
     score on genuinely out-of-sample rows the model never trained on. The
     returned ``predictions`` cover the full ``data`` regardless of the window.
+
+    Requires ``method`` to be set on the role; for a blank method (all models)
+    use :func:`evaluate_all`.
     """
-    fc = load_forecaster(sel, role)
-    _, Y = fc.features(data)
-    pred = fc.predict(data)
-    yt, yp = Y.reindex(pred.index), pred
-    if start is not None or end is not None:
-        yp = pred.loc[start:end]
-        yt = Y.reindex(yp.index)
-    metrics = per_horizon_metrics(yt, yp.to_numpy())
-    period = (yp.index.min(), yp.index.max()) if len(yp) else None
-    return EvalResult(metrics=metrics, predictions=pred, period=period)
+    return _eval_fc(load_forecaster(sel, role), data, start, end)
+
+
+def evaluate_all(sel: SelectionConfig, role: str, data: pd.DataFrame,
+                 start=None, end=None) -> dict[str, EvalResult]:
+    """Evaluate one or all trained models for a role, keyed by method name.
+
+    If the role pins a ``method`` only that one is evaluated; if ``method`` is
+    blank, every method in the target's ``_latest.json`` is evaluated (each at
+    its latest hash). Same scoring semantics as :func:`evaluate`.
+    """
+    rs = sel.roles[role]
+    store = ModelStore(sel.store_root)
+    methods = [rs.method] if rs.method else store.list_methods(rs.target)
+    out: dict[str, EvalResult] = {}
+    for m in methods:
+        model, recipe = store.load(rs.target, m, rs.feature_hash, rs.train_start, rs.train_end)
+        out[m] = _eval_fc(FittedForecaster(model=model, recipe=recipe), data, start, end)
+    return out

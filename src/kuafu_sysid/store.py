@@ -52,6 +52,14 @@ class ModelStore:
             raise FileNotFoundError(f"No model {method}/{feature_hash} in {d}")
         return hits[-1].name.replace("_config.json", "")
 
+    def list_methods(self, target) -> list[str]:
+        """Method names that have a trained model for ``target`` (from _latest.json)."""
+        latest_path = self.root / target / "_latest.json"
+        if not latest_path.exists():
+            raise FileNotFoundError(f"No trained models in {self.root / target}")
+        latest = json.loads(latest_path.read_text(encoding="utf-8"))
+        return [m for m in latest if m != "updated_at"]
+
     def load(self, target, method, feature_hash=None, train_start=None, train_end=None):
         d = self.root / target
         stem = self._resolve_stem(d, method, feature_hash, train_start, train_end)

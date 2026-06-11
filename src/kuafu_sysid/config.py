@@ -94,7 +94,7 @@ class TrainConfig:
 @dataclass
 class RoleSpec:
     target: str
-    method: str
+    method: str | None = None       # blank/None -> evaluate ALL trained methods (latest each)
     feature_hash: str | None = None
     train_start: str | None = None
     train_end: str | None = None
