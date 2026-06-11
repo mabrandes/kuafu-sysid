@@ -28,7 +28,7 @@ def _split(X, Y, split):
 
 
 def _save_model_plots(art_path, model, X_te=None, target_columns=None,
-                      actual=None, step: int = 1) -> None:
+                      actual=None, step: int = 1, clip_min=None) -> None:
     """Per-model PNGs next to the artefact: learning curve (XGB), feature importance
     (tree models), and an uncertainty-band timeseries (quantile LGBM).
     Cross-model comparisons live in _save_compare_plots."""
@@ -54,6 +54,8 @@ def _save_model_plots(art_path, model, X_te=None, target_columns=None,
     if (X_te is not None and hasattr(model, "predict_quantiles")
             and len(getattr(model, "quantiles", (0.5,))) > 1):
         qp = model.predict_quantiles(X_te)
+        if clip_min is not None:
+            qp = {q: np.maximum(a, clip_min) for q, a in qp.items()}
         qs = sorted(qp)
         wide = lambda a: pd.DataFrame(a, index=X_te.index, columns=target_columns)
         w0 = X_te.index.min()
@@ -121,6 +123,7 @@ def train(cfg: TrainConfig, verbose: bool = True,
         "lag": list(normalize_lags(cfg.lag)), "horizon": cfg.horizon, "dt_min": dt_min,
         "time_features": cfg.time_features, "feature_hash": fhash,
         "train_start": cfg.train_start, "train_end": cfg.train_end,
+        "clip_min": cfg.clip_min,
         "feature_columns": list(X.columns), "target_columns": list(Y.columns),
     }
     store = ModelStore(cfg.store_root)
@@ -136,6 +139,8 @@ def train(cfg: TrainConfig, verbose: bool = True,
                           quantiles=cfg.quantiles, cv=cfg.linear_cv)
         model.fit(X_tr, Y_tr)
         pred = model.predict(X_te, endog=df[cfg.spec.endog])
+        if cfg.clip_min is not None:
+            pred = np.maximum(pred, cfg.clip_min)   # e.g. PV can't be negative
         results[method] = per_horizon_metrics(Y_te, pred)
         preds_by_method[method] = pd.DataFrame(pred, index=X_te.index, columns=list(Y.columns))
         dt = time.perf_counter() - t0
@@ -147,7 +152,7 @@ def train(cfg: TrainConfig, verbose: bool = True,
                              cfg.train_start, cfg.train_end)
             if save_plots:
                 _save_model_plots(art, model, X_te=X_te, target_columns=list(Y.columns),
-                                  actual=df[cfg.spec.endog], step=step12h)
+                                  actual=df[cfg.spec.endog], step=step12h, clip_min=cfg.clip_min)
     if cfg.save and save_plots and results:
         _save_compare_plots(store.root / cfg.target, cfg.target, results,
                             preds_by_method, df[cfg.spec.endog], step=step12h)

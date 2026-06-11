@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+import numpy as np
 import pandas as pd
 
 from kuafu_sysid.config import SelectionConfig
@@ -26,10 +27,14 @@ class FittedForecaster:
         r = self.recipe
         return build_features(df, self._spec(), r["lag"], r["horizon"], r["dt_min"], r["time_features"])
 
+    def _clip(self, a):
+        cm = self.recipe.get("clip_min")
+        return a if cm is None else np.maximum(a, cm)
+
     def predict(self, df: pd.DataFrame) -> pd.DataFrame:
         X, _ = self.features(df)
         X = X.reindex(columns=self.recipe["feature_columns"])
-        pred = self.model.predict(X, endog=df[self.recipe["endog"]])
+        pred = self._clip(self.model.predict(X, endog=df[self.recipe["endog"]]))
         return pd.DataFrame(pred, index=X.index, columns=self.recipe["target_columns"])
 
     def predict_quantiles(self, df: pd.DataFrame) -> dict:
@@ -41,7 +46,7 @@ class FittedForecaster:
         X, _ = self.features(df)
         X = X.reindex(columns=self.recipe["feature_columns"])
         cols, idx = self.recipe["target_columns"], X.index
-        return {q: pd.DataFrame(a, index=idx, columns=cols)
+        return {q: pd.DataFrame(self._clip(a), index=idx, columns=cols)
                 for q, a in self.model.predict_quantiles(X).items()}
 
 
