@@ -196,10 +196,13 @@ def plot_issue_profile(actual: pd.Series, predictions: pd.DataFrame, hour: int =
     if ax is None:
         _, ax = plt.subplots(figsize=(9, 4))
     if band is not None:
-        lo = np.nanquantile(fc, band[0], axis=0)
-        hi = np.nanquantile(fc, band[1], axis=0)
-        ax.fill_between(lead_h, lo, hi, alpha=0.2, color="tab:blue",
-                        label=f"forecast {int(band[0]*100)}–{int(band[1]*100)}% across days")
+        pct = f"{int(band[0] * 100)}–{int(band[1] * 100)}%"
+        ax.fill_between(lead_h, np.nanquantile(meas, band[0], axis=0),
+                        np.nanquantile(meas, band[1], axis=0),
+                        alpha=0.15, color="black", label=f"measured {pct} across days")
+        ax.fill_between(lead_h, np.nanquantile(fc, band[0], axis=0),
+                        np.nanquantile(fc, band[1], axis=0),
+                        alpha=0.20, color="tab:blue", label=f"forecast {pct} across days")
     ax.plot(lead_h, np.nanmean(meas, axis=0), color="black", lw=1.6, marker=".", label="measured (mean)")
     ax.plot(lead_h, np.nanmean(fc, axis=0), color="tab:blue", lw=1.4, marker=".", label="forecast (mean)")
     ax.set_xlabel(f"hours after {hour:02d}:{minute:02d}")
