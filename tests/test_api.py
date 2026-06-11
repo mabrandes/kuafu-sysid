@@ -44,10 +44,8 @@ def test_plot_issue_timeseries_and_profile():
     preds = pd.DataFrame({f"y_h_{h}": np.sin((np.arange(240) + h) / 3.0) for h in range(1, 25)},
                          index=idx)  # 24h horizon
     assert plot_issue_timeseries(actual, preds, hour=8) is not None   # stitched
-    assert plot_issue_profile(actual, preds, hour=8) is not None      # averaged profile
-    lo = preds - 1.0
-    hi = preds + 1.0
-    assert plot_issue_profile(actual, preds, hour=8, lower=lo, upper=hi) is not None  # with band
+    assert plot_issue_profile(actual, preds, hour=8, band=None) is not None      # no band
+    assert plot_issue_profile(actual, preds, hour=8, band=(0.05, 0.95)) is not None  # empirical band
 
 
 def test_plot_timeseries_returns_axes():

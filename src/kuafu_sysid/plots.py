@@ -164,30 +164,28 @@ def plot_issue_timeseries(actual: pd.Series, predictions: pd.DataFrame, hour: in
 
 
 def plot_issue_profile(actual: pd.Series, predictions: pd.DataFrame, hour: int = 8,
-                       minute: int = 0, start=None, end=None,
-                       lower: pd.DataFrame | None = None, upper: pd.DataFrame | None = None,
-                       ax=None):
+                       minute: int = 0, start=None, end=None, band=(0.05, 0.95), ax=None):
     """Average the forecast issued at ``hour:minute`` and the matching measurements
     over all days → mean lead-time profile (e.g. the typical 08:00→08:00 D+1 PV day).
-    x-axis is hours ahead of the issue time. Optional ``lower``/``upper`` quantile
-    frames (e.g. 0.05/0.95) add a shaded mean uncertainty band."""
+    x-axis is hours ahead of the issue time. ``band`` (e.g. ``(0.05, 0.95)``) shades
+    the empirical quantile spread of the forecast **across days** (the day-to-day
+    range, computed from the data — not the model's quantiles); pass None to hide it."""
     dt = predictions.index.to_series().diff().median()
     H = predictions.shape[1]
     origins = _issue_origins(predictions, hour, minute, start, end)
-
-    def _mean_profile(frame):
-        return np.nanmean(np.array([frame.loc[o].to_numpy() for o in origins], dtype=float), axis=0)
-
-    meas = np.nanmean(np.array([actual.reindex([o + (h + 1) * dt for h in range(H)]).to_numpy()
-                                for o in origins], dtype=float), axis=0)
+    fc = np.array([predictions.loc[o].to_numpy() for o in origins], dtype=float)        # (days, H)
+    meas = np.array([actual.reindex([o + (h + 1) * dt for h in range(H)]).to_numpy()
+                     for o in origins], dtype=float)
     lead_h = [(h + 1) * dt.total_seconds() / 3600 for h in range(H)]
     if ax is None:
         _, ax = plt.subplots(figsize=(9, 4))
-    if lower is not None and upper is not None:
-        ax.fill_between(lead_h, _mean_profile(lower), _mean_profile(upper),
-                        alpha=0.2, color="tab:blue", label="forecast band (mean)")
-    ax.plot(lead_h, meas, color="black", lw=1.6, marker=".", label="measured (mean)")
-    ax.plot(lead_h, _mean_profile(predictions), color="tab:blue", lw=1.4, marker=".", label="forecast (mean)")
+    if band is not None:
+        lo = np.nanquantile(fc, band[0], axis=0)
+        hi = np.nanquantile(fc, band[1], axis=0)
+        ax.fill_between(lead_h, lo, hi, alpha=0.2, color="tab:blue",
+                        label=f"forecast {int(band[0]*100)}–{int(band[1]*100)}% across days")
+    ax.plot(lead_h, np.nanmean(meas, axis=0), color="black", lw=1.6, marker=".", label="measured (mean)")
+    ax.plot(lead_h, np.nanmean(fc, axis=0), color="tab:blue", lw=1.4, marker=".", label="forecast (mean)")
     ax.set_xlabel(f"hours after {hour:02d}:{minute:02d}")
     ax.set_ylabel(predictions.columns[0].rsplit("_h_", 1)[0])
     ax.set_title(f"Mean {hour:02d}:{minute:02d} day-ahead profile (n={len(origins)} days)")
