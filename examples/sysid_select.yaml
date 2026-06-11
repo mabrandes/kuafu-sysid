@@ -5,6 +5,6 @@ roles:
   demo:
     target: demo
     method: XGB
-    feature_hash:        # leave blank to use models/demo/_latest.json; or pin a hash
-    train_start: 2024-01-01
+    feature_hash:        # blank -> latest trained model (models/demo/_latest.json); or pin a hash
+    train_start: 2024-01-01   # only used when feature_hash is set
     train_end:   2024-03-01

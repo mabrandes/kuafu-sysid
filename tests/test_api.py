@@ -34,6 +34,19 @@ def test_plot_forecast_origin():
     assert ax is not None
 
 
+def test_plot_issue_timeseries_and_profile():
+    import matplotlib
+    matplotlib.use("Agg")
+    import numpy as np, pandas as pd
+    from kuafu_sysid import plot_issue_timeseries, plot_issue_profile
+    idx = pd.date_range("2025-07-01", periods=240, freq="h", tz="Europe/Zurich")  # 10 days
+    actual = pd.Series(np.sin(np.arange(240) / 3.0), index=idx)
+    preds = pd.DataFrame({f"y_h_{h}": np.sin((np.arange(240) + h) / 3.0) for h in range(1, 25)},
+                         index=idx)  # 24h horizon
+    assert plot_issue_timeseries(actual, preds, hour=8) is not None   # stitched
+    assert plot_issue_profile(actual, preds, hour=8) is not None      # averaged profile
+
+
 def test_plot_timeseries_returns_axes():
     import matplotlib
     matplotlib.use("Agg")

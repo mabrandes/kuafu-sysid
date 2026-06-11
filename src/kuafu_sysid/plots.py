@@ -126,6 +126,67 @@ def plot_forecast_origin(actual: pd.Series, predictions: pd.DataFrame, origin,
     return ax
 
 
+def _issue_origins(predictions: pd.DataFrame, hour: int, minute: int = 0,
+                   start=None, end=None) -> pd.DatetimeIndex:
+    idx = predictions.index
+    o = idx[(idx.hour == hour) & (idx.minute == minute)]
+    if start is not None or end is not None:
+        o = pd.Series(0, index=o).loc[start:end].index
+    if len(o) == 0:
+        raise ValueError(f"no forecasts issued at {hour:02d}:{minute:02d}")
+    return o
+
+
+def plot_issue_timeseries(actual: pd.Series, predictions: pd.DataFrame, hour: int = 8,
+                          minute: int = 0, start=None, end=None, ax=None):
+    """Stitch together every forecast *issued at* ``hour:minute`` into one continuous
+    operational series vs. measured. Each issue covers the next H steps (e.g. an
+    08:00 day-ahead PV forecast covers 08:00→08:00 D+1), so consecutive daily issues
+    abut into a gapless line — the forecast you'd actually have run on."""
+    dt = predictions.index.to_series().diff().median()
+    origins = _issue_origins(predictions, hour, minute, start, end)
+    pieces = [pd.Series(predictions.loc[o].to_numpy(),
+                        index=[o + (h + 1) * dt for h in range(predictions.shape[1])])
+              for o in origins]
+    fc = pd.concat(pieces).sort_index()
+    fc = fc[~fc.index.duplicated(keep="last")]
+    a = actual.loc[fc.index.min():fc.index.max()]
+    if ax is None:
+        _, ax = plt.subplots(figsize=(12, 4))
+    ax.plot(a.index, a.to_numpy(), color="black", lw=1.4, label="measured")
+    ax.plot(fc.index, fc.to_numpy(), color="tab:blue", lw=1.0, alpha=0.85,
+            label=f"forecast issued {hour:02d}:{minute:02d}")
+    ax.set_ylabel(predictions.columns[0].rsplit("_h_", 1)[0])
+    ax.set_title(f"All {hour:02d}:{minute:02d} forecasts (stitched) vs measured")
+    ax.legend(fontsize=8)
+    ax.grid(alpha=0.3)
+    return ax
+
+
+def plot_issue_profile(actual: pd.Series, predictions: pd.DataFrame, hour: int = 8,
+                       minute: int = 0, start=None, end=None, ax=None):
+    """Average the forecast issued at ``hour:minute`` and the matching measurements
+    over all days → mean lead-time profile (e.g. the typical 08:00→08:00 D+1 PV day).
+    x-axis is hours ahead of the issue time."""
+    dt = predictions.index.to_series().diff().median()
+    H = predictions.shape[1]
+    origins = _issue_origins(predictions, hour, minute, start, end)
+    fc = np.array([predictions.loc[o].to_numpy() for o in origins], dtype=float)
+    meas = np.array([actual.reindex([o + (h + 1) * dt for h in range(H)]).to_numpy()
+                     for o in origins], dtype=float)
+    lead_h = [(h + 1) * dt.total_seconds() / 3600 for h in range(H)]
+    if ax is None:
+        _, ax = plt.subplots(figsize=(9, 4))
+    ax.plot(lead_h, np.nanmean(meas, axis=0), color="black", lw=1.6, marker=".", label="measured (mean)")
+    ax.plot(lead_h, np.nanmean(fc, axis=0), color="tab:blue", lw=1.4, marker=".", label="forecast (mean)")
+    ax.set_xlabel(f"hours after {hour:02d}:{minute:02d}")
+    ax.set_ylabel(predictions.columns[0].rsplit("_h_", 1)[0])
+    ax.set_title(f"Mean {hour:02d}:{minute:02d} day-ahead profile (n={len(origins)} days)")
+    ax.legend(fontsize=8)
+    ax.grid(alpha=0.3)
+    return ax
+
+
 def plot_forecast_band(actual: pd.Series, median: pd.DataFrame, lower: pd.DataFrame,
                        upper: pd.DataFrame, step: int = 1, start=None, end=None, ax=None):
     """Measured vs. median forecast with a shaded uncertainty band, at one horizon
