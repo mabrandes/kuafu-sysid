@@ -20,11 +20,24 @@ def plot_error_by_horizon(metrics_by_method: dict[str, pd.DataFrame], metric: st
     return ax
 
 
-def plot_horizon_metrics(metrics, which=("rmse", "mae", "r2"), axes=None):
+def _fmt_period(period) -> str:
+    """Format an evaluation period for a title: a string passes through, a
+    (start, end) pair becomes 'YYYY-MM-DD … YYYY-MM-DD'."""
+    if period is None:
+        return ""
+    if isinstance(period, str):
+        return period
+    a, b = period
+    return f"{pd.Timestamp(a):%Y-%m-%d} … {pd.Timestamp(b):%Y-%m-%d}"
+
+
+def plot_horizon_metrics(metrics, which=("rmse", "mae", "r2"), period=None, axes=None):
     """One panel per metric (RMSE / MAE / R² by default) vs. horizon step.
 
     ``metrics`` is a per-horizon DataFrame (e.g. ``evaluate(...).metrics``) or a
-    ``{name: DataFrame}`` dict to overlay several models.
+    ``{name: DataFrame}`` dict to overlay several models. ``period`` (a (start, end)
+    pair or string, e.g. ``evaluate(...).period``) is shown as a figure subtitle so
+    the plot records which window it was evaluated on.
     """
     if isinstance(metrics, pd.DataFrame):
         metrics = {"model": metrics}
@@ -38,6 +51,8 @@ def plot_horizon_metrics(metrics, which=("rmse", "mae", "r2"), axes=None):
         ax.set_title(met.upper())
         ax.grid(alpha=0.3)
         ax.legend(fontsize=8)
+    if period is not None:
+        axes[0].figure.suptitle(f"error by horizon — evaluated {_fmt_period(period)}", fontsize=10)
     return axes
 
 
@@ -157,7 +172,8 @@ def plot_issue_timeseries(actual: pd.Series, predictions: pd.DataFrame, hour: in
     ax.plot(fc.index, fc.to_numpy(), color="tab:blue", lw=1.0, alpha=0.85,
             label=f"forecast issued {hour:02d}:{minute:02d}")
     ax.set_ylabel(predictions.columns[0].rsplit("_h_", 1)[0])
-    ax.set_title(f"All {hour:02d}:{minute:02d} forecasts (stitched) vs measured")
+    ax.set_title(f"All {hour:02d}:{minute:02d} forecasts (stitched) vs measured "
+                 f"— {_fmt_period((fc.index.min(), fc.index.max()))}")
     ax.legend(fontsize=8)
     ax.grid(alpha=0.3)
     return ax
@@ -188,7 +204,8 @@ def plot_issue_profile(actual: pd.Series, predictions: pd.DataFrame, hour: int =
     ax.plot(lead_h, np.nanmean(fc, axis=0), color="tab:blue", lw=1.4, marker=".", label="forecast (mean)")
     ax.set_xlabel(f"hours after {hour:02d}:{minute:02d}")
     ax.set_ylabel(predictions.columns[0].rsplit("_h_", 1)[0])
-    ax.set_title(f"Mean {hour:02d}:{minute:02d} day-ahead profile (n={len(origins)} days)")
+    ax.set_title(f"Mean {hour:02d}:{minute:02d} day-ahead profile "
+                 f"(n={len(origins)} days, {_fmt_period((origins.min(), origins.max()))})")
     ax.legend(fontsize=8)
     ax.grid(alpha=0.3)
     return ax

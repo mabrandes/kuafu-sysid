@@ -56,3 +56,4 @@ def test_evaluate_metric_window_scores_subset(tmp_path):
     res = evaluate(sel, "price", df, start=cut)          # metrics only after `cut`
     assert int(res.metrics["n"].iloc[0]) < len(df)        # fewer rows scored
     assert res.predictions.index.equals(df.index)         # predictions still cover all data
+    assert res.period is not None and res.period[0] >= cut   # scored window starts at `cut`

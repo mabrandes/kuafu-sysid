@@ -70,6 +70,7 @@ class FittedForecaster:
 class EvalResult:
     metrics: pd.DataFrame
     predictions: pd.DataFrame
+    period: tuple | None = None   # (first, last) timestamp the metrics were scored over
 
 
 def load_forecaster(sel: SelectionConfig, role: str) -> FittedForecaster:
@@ -96,4 +97,5 @@ def evaluate(sel: SelectionConfig, role: str, data: pd.DataFrame,
         yp = pred.loc[start:end]
         yt = Y.reindex(yp.index)
     metrics = per_horizon_metrics(yt, yp.to_numpy())
-    return EvalResult(metrics=metrics, predictions=pred)
+    period = (yp.index.min(), yp.index.max()) if len(yp) else None
+    return EvalResult(metrics=metrics, predictions=pred, period=period)
