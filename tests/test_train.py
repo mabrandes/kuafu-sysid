@@ -46,6 +46,23 @@ def test_train_writes_artefacts_and_returns_metrics(tmp_path):
     assert "t_timeseries_compare.png" in pngs
 
 
+def test_train_resamples_before_features(tmp_path):
+    # native data is hourly; resample_min=180 -> 3h grid, so steps_per_day=8
+    data_path = _make_parquet(tmp_path)   # 400 hourly rows
+    cfg = TrainConfig(
+        target="t", spec=FeatureSpec(endog="y", exog=("a",)),
+        data_path=str(data_path), lag=8, horizon=2, dt_min=None,
+        train_start="2025-01-01", train_end="2025-01-15", split=-0.2,
+        models=["Linear"], resample_min=180, resample_agg="mean",
+        time_features={"enabled": False, "holidays_country": None},
+        store_root=str(tmp_path / "models"), save=True,
+    )
+    train(cfg, save_plots=False)
+    import json, glob
+    recipe = json.loads(open(glob.glob(str(tmp_path / "models" / "t" / "*_config.json"))[0]).read())
+    assert recipe["dt_min"] == 180          # effective timestep is the resample target
+
+
 def test_train_no_plots_when_disabled(tmp_path):
     data_path = _make_parquet(tmp_path)
     train(_cfg(tmp_path, data_path), save_plots=False)

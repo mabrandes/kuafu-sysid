@@ -76,6 +76,18 @@ def feature_hash(spec: FeatureSpec, lag, horizon: int, dt_min, time_features: di
     return hashlib.sha1(blob).hexdigest()[:6]
 
 
+def resample_df(df: pd.DataFrame, minutes: int, agg="mean") -> pd.DataFrame:
+    """Downsample a tz-aware time series to ``minutes`` resolution before feature
+    building. ``agg`` is either a single rule applied to all columns (``"mean"``
+    or ``"sum"``) or a ``{column: rule}`` map — columns not listed default to
+    ``"mean"``. Use ``"sum"`` for accumulated quantities (e.g. PV energy per step)
+    and ``"mean"`` for rates/levels (irradiance, temperature, price, load)."""
+    r = df.resample(f"{int(minutes)}min")
+    if isinstance(agg, str):
+        return r.agg(agg)
+    return r.agg({c: agg.get(c, "mean") for c in df.columns})
+
+
 def add_time_features(index: pd.DatetimeIndex, time_features: dict | None) -> pd.DataFrame:
     """Calendar features for the chosen components and encoding.
 

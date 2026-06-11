@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 
-from kuafu_sysid.features import FeatureSpec, add_time_features, build_features
+from kuafu_sysid.features import FeatureSpec, add_time_features, build_features, resample_df
 
 
 def _frame(n=200, freq="h"):
@@ -26,6 +26,15 @@ def test_build_features_shapes_and_columns():
     for c in ["y_lag_0", "y_lag_2", "a_lag_0", "a_lag_2", "b", "b_fc_0", "b_fc_1", "hour_sin"]:
         assert c in X.columns
     assert X.index.equals(Y.index)
+
+
+def test_resample_df_per_column_agg():
+    idx = pd.date_range("2025-01-01", periods=8, freq="h", tz="Europe/Zurich")
+    df = pd.DataFrame({"pv": [1.0] * 8, "g": range(8)}, index=idx)
+    out = resample_df(df, minutes=120, agg={"pv": "sum"})   # 2h blocks; g defaults to mean
+    assert out.index.to_series().diff().median() == pd.Timedelta("2h")
+    assert out["pv"].iloc[0] == 2.0          # 1+1 summed
+    assert out["g"].iloc[0] == 0.5           # mean(0,1)
 
 
 def test_build_features_target_alignment():

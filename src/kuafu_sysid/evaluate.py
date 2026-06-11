@@ -23,8 +23,18 @@ class FittedForecaster:
                            exog_with_lag=tuple(r["exog_with_lag"]),
                            forecast_exog=tuple(r["forecast_exog"]))
 
+    def _prep(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Apply the same downsampling used at training (if any), so eval features
+        match the model's resolution."""
+        rm = self.recipe.get("resample_min")
+        if rm:
+            from kuafu_sysid.features import resample_df
+            df = resample_df(df, rm, self.recipe.get("resample_agg", "mean"))
+        return df
+
     def features(self, df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
         r = self.recipe
+        df = self._prep(df)
         return build_features(df, self._spec(), r["lag"], r["horizon"], r["dt_min"], r["time_features"])
 
     def _clip(self, a):
@@ -32,7 +42,9 @@ class FittedForecaster:
         return a if cm is None else np.maximum(a, cm)
 
     def predict(self, df: pd.DataFrame) -> pd.DataFrame:
-        X, _ = self.features(df)
+        df = self._prep(df)
+        X, _ = build_features(df, self._spec(), self.recipe["lag"], self.recipe["horizon"],
+                              self.recipe["dt_min"], self.recipe["time_features"])
         X = X.reindex(columns=self.recipe["feature_columns"])
         pred = self._clip(self.model.predict(X, endog=df[self.recipe["endog"]]))
         return pd.DataFrame(pred, index=X.index, columns=self.recipe["target_columns"])
@@ -43,7 +55,9 @@ class FittedForecaster:
         if not hasattr(self.model, "predict_quantiles"):
             raise ValueError(f"{self.recipe['method']} has no quantiles "
                              "(train an LGBM with a `quantiles` band)")
-        X, _ = self.features(df)
+        df = self._prep(df)
+        X, _ = build_features(df, self._spec(), self.recipe["lag"], self.recipe["horizon"],
+                              self.recipe["dt_min"], self.recipe["time_features"])
         X = X.reindex(columns=self.recipe["feature_columns"])
         cols, idx = self.recipe["target_columns"], X.index
         return {q: pd.DataFrame(self._clip(a), index=idx, columns=cols)

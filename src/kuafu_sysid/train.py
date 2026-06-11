@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 
 from kuafu_sysid.config import TrainConfig
-from kuafu_sysid.features import build_features, feature_hash, normalize_lags
+from kuafu_sysid.features import build_features, feature_hash, normalize_lags, resample_df
 from kuafu_sysid.metrics import per_horizon_metrics
 from kuafu_sysid.models import get_model
 from kuafu_sysid.store import ModelStore
@@ -106,7 +106,12 @@ def train(cfg: TrainConfig, verbose: bool = True,
     df = pd.read_parquet(cfg.data_path).sort_index()
     if cfg.train_start or cfg.train_end:
         df = df.loc[cfg.train_start:cfg.train_end]
-    dt_min = cfg.dt_min or int(round(df.index.to_series().diff().median().total_seconds() / 60))
+    if cfg.resample_min:                       # optional downsample before features
+        df = resample_df(df, cfg.resample_min, cfg.resample_agg)
+        log(f"resampled to {cfg.resample_min}min (agg={cfg.resample_agg})")
+    # effective timestep: the resample target if set, else configured/inferred
+    dt_min = cfg.resample_min or cfg.dt_min or int(round(
+        df.index.to_series().diff().median().total_seconds() / 60))
     spd, spw = _steps_per(dt_min)
     log(f"data: {len(df)} rows  {df.index.min():%Y-%m-%d}..{df.index.max():%Y-%m-%d}  (dt={dt_min}min)")
 
@@ -124,6 +129,7 @@ def train(cfg: TrainConfig, verbose: bool = True,
         "time_features": cfg.time_features, "feature_hash": fhash,
         "train_start": cfg.train_start, "train_end": cfg.train_end,
         "clip_min": cfg.clip_min,
+        "resample_min": cfg.resample_min, "resample_agg": cfg.resample_agg,
         "feature_columns": list(X.columns), "target_columns": list(Y.columns),
     }
     store = ModelStore(cfg.store_root)
