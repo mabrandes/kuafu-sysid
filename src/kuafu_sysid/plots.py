@@ -164,21 +164,30 @@ def plot_issue_timeseries(actual: pd.Series, predictions: pd.DataFrame, hour: in
 
 
 def plot_issue_profile(actual: pd.Series, predictions: pd.DataFrame, hour: int = 8,
-                       minute: int = 0, start=None, end=None, ax=None):
+                       minute: int = 0, start=None, end=None,
+                       lower: pd.DataFrame | None = None, upper: pd.DataFrame | None = None,
+                       ax=None):
     """Average the forecast issued at ``hour:minute`` and the matching measurements
     over all days → mean lead-time profile (e.g. the typical 08:00→08:00 D+1 PV day).
-    x-axis is hours ahead of the issue time."""
+    x-axis is hours ahead of the issue time. Optional ``lower``/``upper`` quantile
+    frames (e.g. 0.05/0.95) add a shaded mean uncertainty band."""
     dt = predictions.index.to_series().diff().median()
     H = predictions.shape[1]
     origins = _issue_origins(predictions, hour, minute, start, end)
-    fc = np.array([predictions.loc[o].to_numpy() for o in origins], dtype=float)
-    meas = np.array([actual.reindex([o + (h + 1) * dt for h in range(H)]).to_numpy()
-                     for o in origins], dtype=float)
+
+    def _mean_profile(frame):
+        return np.nanmean(np.array([frame.loc[o].to_numpy() for o in origins], dtype=float), axis=0)
+
+    meas = np.nanmean(np.array([actual.reindex([o + (h + 1) * dt for h in range(H)]).to_numpy()
+                                for o in origins], dtype=float), axis=0)
     lead_h = [(h + 1) * dt.total_seconds() / 3600 for h in range(H)]
     if ax is None:
         _, ax = plt.subplots(figsize=(9, 4))
-    ax.plot(lead_h, np.nanmean(meas, axis=0), color="black", lw=1.6, marker=".", label="measured (mean)")
-    ax.plot(lead_h, np.nanmean(fc, axis=0), color="tab:blue", lw=1.4, marker=".", label="forecast (mean)")
+    if lower is not None and upper is not None:
+        ax.fill_between(lead_h, _mean_profile(lower), _mean_profile(upper),
+                        alpha=0.2, color="tab:blue", label="forecast band (mean)")
+    ax.plot(lead_h, meas, color="black", lw=1.6, marker=".", label="measured (mean)")
+    ax.plot(lead_h, _mean_profile(predictions), color="tab:blue", lw=1.4, marker=".", label="forecast (mean)")
     ax.set_xlabel(f"hours after {hour:02d}:{minute:02d}")
     ax.set_ylabel(predictions.columns[0].rsplit("_h_", 1)[0])
     ax.set_title(f"Mean {hour:02d}:{minute:02d} day-ahead profile (n={len(origins)} days)")

@@ -45,6 +45,9 @@ def test_plot_issue_timeseries_and_profile():
                          index=idx)  # 24h horizon
     assert plot_issue_timeseries(actual, preds, hour=8) is not None   # stitched
     assert plot_issue_profile(actual, preds, hour=8) is not None      # averaged profile
+    lo = preds - 1.0
+    hi = preds + 1.0
+    assert plot_issue_profile(actual, preds, hour=8, lower=lo, upper=hi) is not None  # with band
 
 
 def test_plot_timeseries_returns_axes():
