@@ -180,12 +180,15 @@ def plot_issue_timeseries(actual: pd.Series, predictions: pd.DataFrame, hour: in
 
 
 def plot_issue_profile(actual: pd.Series, predictions: pd.DataFrame, hour: int = 8,
-                       minute: int = 0, start=None, end=None, band=(0.05, 0.95), ax=None):
+                       minute: int = 0, start=None, end=None, band=(0.05, 0.95),
+                       baseline: pd.DataFrame | None = None, baseline_label="prev_day", ax=None):
     """Average the forecast issued at ``hour:minute`` and the matching measurements
     over all days → mean lead-time profile (e.g. the typical 08:00→08:00 D+1 PV day).
     x-axis is hours ahead of the issue time. ``band`` (e.g. ``(0.05, 0.95)``) shades
-    the empirical quantile spread of the forecast **across days** (the day-to-day
-    range, computed from the data — not the model's quantiles); pass None to hide it."""
+    the empirical quantile spread **across days** (forecast and measured) — the
+    day-to-day range, not the model's quantiles; pass None to hide it. Each forecast
+    line's legend label carries its RMSE/MAE/R² over the window. ``baseline`` is an
+    optional second wide-forecast frame (e.g. a persistence model) drawn for comparison."""
     dt = predictions.index.to_series().diff().median()
     H = predictions.shape[1]
     origins = _issue_origins(predictions, hour, minute, start, end)
@@ -193,6 +196,16 @@ def plot_issue_profile(actual: pd.Series, predictions: pd.DataFrame, hour: int =
     meas = np.array([actual.reindex([o + (h + 1) * dt for h in range(H)]).to_numpy()
                      for o in origins], dtype=float)
     lead_h = [(h + 1) * dt.total_seconds() / 3600 for h in range(H)]
+
+    def _label(name, pred_mat):   # name + RMSE/MAE/R² over all (day, lead) pairs
+        msk = ~(np.isnan(pred_mat) | np.isnan(meas))
+        err, a = (pred_mat - meas)[msk], meas[msk]
+        if err.size == 0:
+            return f"{name} (mean)"
+        ss = float(np.sum((a - a.mean()) ** 2))
+        r2 = 1.0 - float(np.sum(err ** 2)) / ss if ss > 0 else float("nan")
+        return (f"{name} — RMSE {np.sqrt(np.mean(err ** 2)):.2f}, "
+                f"MAE {np.mean(np.abs(err)):.2f}, R² {r2:.2f}")
     if ax is None:
         _, ax = plt.subplots(figsize=(9, 4))
     if band is not None:
@@ -204,18 +217,15 @@ def plot_issue_profile(actual: pd.Series, predictions: pd.DataFrame, hour: int =
                         np.nanquantile(fc, band[1], axis=0),
                         alpha=0.20, color="tab:blue", label=f"forecast {pct} across days")
     ax.plot(lead_h, np.nanmean(meas, axis=0), color="black", lw=1.6, marker=".", label="measured (mean)")
-    ax.plot(lead_h, np.nanmean(fc, axis=0), color="tab:blue", lw=1.4, marker=".", label="forecast (mean)")
+    ax.plot(lead_h, np.nanmean(fc, axis=0), color="tab:blue", lw=1.4, marker=".", label=_label("forecast", fc))
+    if baseline is not None:
+        bmat = baseline.reindex(origins).to_numpy(float)
+        ax.plot(lead_h, np.nanmean(bmat, axis=0), color="tab:green", lw=1.2, ls="--",
+                marker=".", label=_label(baseline_label, bmat))
     ax.set_xlabel(f"hours after {hour:02d}:{minute:02d}")
     ax.set_ylabel(predictions.columns[0].rsplit("_h_", 1)[0])
-    # metrics over all (day, lead) pairs in the window
-    m = ~(np.isnan(fc) | np.isnan(meas))
-    err, a = (fc - meas)[m], meas[m]
-    rmse, mae = float(np.sqrt(np.mean(err ** 2))), float(np.mean(np.abs(err)))
-    ss_tot = float(np.sum((a - a.mean()) ** 2))
-    r2 = 1.0 - float(np.sum(err ** 2)) / ss_tot if ss_tot > 0 else float("nan")
     ax.set_title(f"Mean {hour:02d}:{minute:02d} day-ahead profile "
-                 f"(n={len(origins)} days, {_fmt_period((origins.min(), origins.max()))})\n"
-                 f"RMSE={rmse:.2f}  MAE={mae:.2f}  R²={r2:.2f}")
+                 f"(n={len(origins)} days, {_fmt_period((origins.min(), origins.max()))})")
     ax.legend(fontsize=8)
     ax.grid(alpha=0.3)
     return ax
