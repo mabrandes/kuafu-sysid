@@ -47,3 +47,16 @@ def test_load_falls_back_to_latest(tmp_path):
     store.save("da_price", "Linear", model, _recipe(), "2025-01-01", "2025-02-01")
     _, recipe = store.load("da_price", "Linear")  # no hash/dates -> _latest.json
     assert recipe["method"] == "Linear"
+
+
+def test_no_hash_uses_latest_even_with_dates(tmp_path):
+    # blank feature_hash -> most recently trained model, NOT the alphabetical pick
+    store = ModelStore(tmp_path)
+    model, _ = _fitted()
+    r1 = {**_recipe(), "feature_hash": "zzzzzz"}
+    store.save("da_price", "Linear", model, r1, "2025-01-01", "2025-02-01")
+    r2 = {**_recipe(), "feature_hash": "aaaaaa"}
+    store.save("da_price", "Linear", model, r2, "2025-01-01", "2025-02-01")  # saved last = latest
+    _, recipe = store.load("da_price", "Linear",
+                           train_start="2025-01-01", train_end="2025-02-01")
+    assert recipe["feature_hash"] == "aaaaaa"   # latest, not alphabetical (zzzzzz)

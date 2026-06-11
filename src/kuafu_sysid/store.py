@@ -34,20 +34,23 @@ class ModelStore:
         return d / f"{stem}.{model.EXT}"
 
     def _resolve_stem(self, d: Path, method, feature_hash, train_start, train_end) -> str:
-        if feature_hash and train_start and train_end:
-            return self._stem(method, feature_hash, train_start, train_end)
-        if feature_hash:
-            hits = sorted(d.glob(f"{method}_{feature_hash}_*_config.json"))
-            if not hits:
-                raise FileNotFoundError(f"No model {method}/{feature_hash} in {d}")
-            return hits[-1].name.replace("_config.json", "")
+        # No hash pinned -> always the most recently trained model for this method
+        # (the `_latest.json` pointer); train_start/train_end are ignored here.
+        if not feature_hash:
+            latest_path = d / "_latest.json"
+            if not latest_path.exists():
+                raise FileNotFoundError(f"No trained models in {d} (no _latest.json)")
+            latest = json.loads(latest_path.read_text(encoding="utf-8"))
+            if method not in latest:
+                raise FileNotFoundError(f"No trained {method} in {d} (_latest.json)")
+            return latest[method]
+        # Hash pinned -> exact stem (with dates) or newest file for that hash.
         if train_start and train_end:
-            hits = sorted(d.glob(f"{method}_*_{train_start}_{train_end}_config.json"))
-            if not hits:
-                raise FileNotFoundError(f"No model {method} for {train_start}..{train_end} in {d}")
-            return hits[-1].name.replace("_config.json", "")
-        latest = json.loads((d / "_latest.json").read_text(encoding="utf-8"))
-        return latest[method]
+            return self._stem(method, feature_hash, train_start, train_end)
+        hits = sorted(d.glob(f"{method}_{feature_hash}_*_config.json"))
+        if not hits:
+            raise FileNotFoundError(f"No model {method}/{feature_hash} in {d}")
+        return hits[-1].name.replace("_config.json", "")
 
     def load(self, target, method, feature_hash=None, train_start=None, train_end=None):
         d = self.root / target
