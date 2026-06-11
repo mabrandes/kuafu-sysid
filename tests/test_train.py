@@ -41,9 +41,10 @@ def test_train_writes_artefacts_and_returns_metrics(tmp_path):
     assert any(n.startswith("XGB_") and n.endswith("_importance.png") for n in pngs)
     assert any(n.startswith("XGB_") and n.endswith("_learning_curve.png") for n in pngs)
     assert not any(n.startswith("Persistence") and n.endswith("_importance.png") for n in pngs)
-    # combined comparison plots (one per target, all models overlaid)
-    assert "t_horizon_compare.png" in pngs
-    assert "t_timeseries_compare.png" in pngs
+    # combined comparison plots (named by feature_hash + train window, all models overlaid)
+    assert any(n.endswith("_horizon_compare.png") for n in pngs)
+    assert any(n.endswith("_timeseries_compare.png") for n in pngs)
+    assert not any(n.startswith("t_") for n in pngs)   # no longer prefixed by target
 
 
 def test_train_downsamples_when_dt_min_coarser(tmp_path):

@@ -66,10 +66,12 @@ def _save_model_plots(art_path, model, X_te=None, target_columns=None,
         fig.savefig(d / f"{stem}_band.png", bbox_inches="tight"); plt.close(fig)
 
 
-def _save_compare_plots(d, target, results, preds_by_method, actual,
+def _save_compare_plots(d, prefix, results, preds_by_method, actual,
                         step: int, days: int = 4) -> None:
     """One combined horizon plot (RMSE/MAE/R², all models) and one combined
-    timeseries plot (all models at horizon `step`, over a short window)."""
+    timeseries plot (all models at horizon `step`, over a short window). Named
+    `{prefix}_*` where prefix = {feature_hash}_{train_start}_{train_end}, matching
+    the per-model artefact naming."""
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
@@ -78,14 +80,14 @@ def _save_compare_plots(d, target, results, preds_by_method, actual,
 
     axes = plot_horizon_metrics(results, which=("rmse", "mae", "r2"))   # all models overlaid
     fig = axes[0].figure
-    fig.savefig(d / f"{target}_horizon_compare.png", bbox_inches="tight"); plt.close(fig)
+    fig.savefig(d / f"{prefix}_horizon_compare.png", bbox_inches="tight"); plt.close(fig)
 
     any_preds = next(iter(preds_by_method.values()))
     w0 = any_preds.index.min()
     w1 = min(w0 + pd.Timedelta(days=days), any_preds.index.max())   # fewer days = clearer
     fig, ax = plt.subplots(figsize=(12, 4.5))
     plot_timeseries_compare(actual, preds_by_method, step=step, start=w0, end=w1, ax=ax)
-    fig.savefig(d / f"{target}_timeseries_compare.png", bbox_inches="tight"); plt.close(fig)
+    fig.savefig(d / f"{prefix}_timeseries_compare.png", bbox_inches="tight"); plt.close(fig)
 
 
 def train(cfg: TrainConfig, verbose: bool = True,
@@ -158,7 +160,8 @@ def train(cfg: TrainConfig, verbose: bool = True,
                 _save_model_plots(art, model, X_te=X_te, target_columns=list(Y.columns),
                                   actual=df[cfg.spec.endog], step=step12h, clip_min=cfg.clip_min)
     if cfg.save and save_plots and results:
-        _save_compare_plots(store.root / cfg.target, cfg.target, results,
+        prefix = f"{fhash}_{cfg.train_start}_{cfg.train_end}"   # match per-model naming
+        _save_compare_plots(store.root / cfg.target, prefix, results,
                             preds_by_method, df[cfg.spec.endog], step=step12h)
     log(f"done: {n} model(s) "
         + ("saved to " + str(store.root / cfg.target) if cfg.save else "(not saved)"))
